@@ -1635,7 +1635,11 @@ def ring_phone(serial):
     total = (int(m.group(1)) * 60 + int(m.group(2)) + 1) % 1440
     hour, minute = divmod(total, 60)
     sh(serial, "cmd media_session volume --stream 4 --set 15 2>/dev/null || cmd media_session volume --stream 4 --set 7 2>/dev/null; true")
-    out = sh(serial, "am start -a android.intent.action.SET_ALARM "
+    # Phones with two Clock apps (e.g. Samsung + Google) would show a chooser, and SKIP_UI then sets nothing.
+    # So aim at one Clock app by package name.
+    pkgs = re.findall(r"^\s+([a-z][\w.]+)/\S+", sh(serial, "pm query-activities --brief -a android.intent.action.SET_ALARM 2>&1"), re.M)
+    target = f"-p {pkgs[0]} " if pkgs else ""
+    out = sh(serial, f"am start {target}-a android.intent.action.SET_ALARM "
                      f"--ei android.intent.extra.alarm.HOUR {hour} --ei android.intent.extra.alarm.MINUTES {minute} "
                      f"--es android.intent.extra.alarm.MESSAGE {q(RING_LABEL)} --ez android.intent.extra.alarm.SKIP_UI true "
                      "--ez android.intent.extra.alarm.VIBRATE true 2>&1")
