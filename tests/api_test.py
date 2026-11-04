@@ -245,3 +245,20 @@ os.remove(os.path.expanduser("~/Library/Application Support/Cellar/sync/"+pid+".
 pv=call("/api/sync/preview",id=pid); ok("rm_mac" not in pv["counts"] and "rm_phone" not in pv["counts"], f"with no history, nothing is planned for deletion {pv['counts']}")
 ok(call("/api/sync/pairs/delete","POST",{"id":pid}).get("ok") and call("/api/sync")["pairs"]==[], "pair removed; files untouched")
 shutil.rmtree(os.path.expanduser("~/SyncTest"),ignore_errors=True); shutil.rmtree(PH,ignore_errors=True)
+# --- Finder (WebDAV) now serves SD cards as a folder next to the internal folders
+def dav(method, path, body=None, headers=None):
+    req=urllib.request.Request(B+path, data=body, method=method, headers=headers or {})
+    try:
+        r=urllib.request.urlopen(req, timeout=30); return r.status, r.read().decode("utf-8","replace")
+    except urllib.error.HTTPError as e: return e.code, e.read().decode("utf-8","replace")
+V="/dav/Google%20Pixel%208%20Pro"
+c,t=dav("PROPFIND",V+"/",headers={"Depth":"1"}); ok(c==207 and V+"/SD%20card/" in t and V+"/Documents/" in t, f"Finder root lists the SD card beside internal folders ({c})")
+c,t=dav("PROPFIND",V+"/SD%20card/",headers={"Depth":"1"}); ok(c==207 and V+"/SD%20card/Documents/" in t and "quota-available-bytes" in t, "SD card folder lists its contents and free space")
+c,t=dav("GET",V+"/SD%20card/Documents/sd-notes.txt"); ok(c==200 and t=="on the card", "Finder can read a file on the card")
+c,_=dav("PUT",V+"/SD%20card/Documents/from-finder.txt",body=b"hello card"); ok(c in (201,204) and open(SD+"/Documents/from-finder.txt").read()=="hello card", f"Finder can write to the card ({c})")
+c,_=dav("DELETE",V+"/SD%20card/Documents/from-finder.txt"); ok(c==204 and not os.path.exists(SD+"/Documents/from-finder.txt") and len(os.listdir(SD+"/.CellarTrash"))>=1, "deleting from Finder uses the card's own Trash")
+c,_=dav("DELETE",V+"/SD%20card"); ok(c==403 and os.path.isdir(SD), "the card itself can't be deleted from Finder")
+c,_=dav("MOVE",V+"/Documents/hi.txt",headers={"Destination":B+V+"/SD%20card/Documents/hi.txt"}); ok(c in (201,204) and os.path.exists(SD+"/Documents/hi.txt") and not os.path.exists(H+"/Documents/hi.txt"), f"move from internal storage to the card ({c})")
+shutil.move(SD+"/Documents/hi.txt",H+"/Documents/hi.txt"); call("/api/trash/empty","POST",{})
+# --- Geist ships with the app and is inlined, so the look works offline
+page=urllib.request.urlopen(B+"/").read().decode(); ok("@font-face{font-family:Geist;src:url(data:font/woff2;base64," in page and "__GEIST__" not in page, "Geist font is bundled into the page")

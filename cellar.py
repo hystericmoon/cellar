@@ -2479,6 +2479,32 @@ def dav_volume_name(serial):
     return re.sub(r"[^A-Za-z0-9 ._-]", "", name).strip() or "Android phone"
 
 
+_dav_vol_cache = {}   # serial -> (time, {display name: path})
+_dav_vol_names = {}   # drive path -> display name, for building links
+
+
+def dav_roots(serial):
+    """SD cards and USB drives appear as folders at the top of the phone's share, named like the sidebar."""
+    hit = _dav_vol_cache.get(serial)
+    if hit and time.time() - hit[0] < 10:
+        return hit[1]
+    try:
+        vols = list_volumes(serial)
+    except Exception:
+        vols = []
+    try:
+        taken = {e["name"] for e in dav_cached_list(serial, HOME_DIR)}
+    except Exception:
+        taken = set()
+    m = {}
+    for v in vols:
+        name = v["name"] if v["name"] not in taken else f"{v['name']} ({v['id']})"
+        m[name] = v["path"]
+        _dav_vol_names[v["path"]] = name
+    _dav_vol_cache[serial] = (time.time(), m)
+    return m
+
+
 def dav_serial_for(vol):
     for d in list_devices()["devices"]:
         if d["state"] == "device" and dav_volume_name(d["serial"]) == vol:
@@ -2563,12 +2589,17 @@ class DavMixin:
         if ".." in rest:
             return None, None, None, raw
         serial = dav_serial_for(vol)
-        remote = posixpath.join(HOME_DIR, *rest) if rest else HOME_DIR
+        base = HOME_DIR
+        if serial and rest and rest[0] in dav_roots(serial):
+            base, rest = dav_roots(serial)[rest[0]], rest[1:]
+        remote = posixpath.join(base, *rest) if rest else base
         return serial, vol, remote, raw
 
     def dav_href(self, vol, remote, is_dir):
-        rel = remote[len(HOME_DIR):].lstrip("/")
-        href = "/dav/" + urllib.parse.quote(vol) + "/" + "/".join(urllib.parse.quote(p) for p in rel.split("/") if p)
+        base = next((r for r in _dav_vol_names if remote == r or remote.startswith(r + "/")), HOME_DIR)
+        rel = remote[len(base):].lstrip("/")
+        parts = ([_dav_vol_names[base]] if base != HOME_DIR else []) + [p for p in rel.split("/") if p]
+        href = "/dav/" + urllib.parse.quote(vol) + "/" + "/".join(urllib.parse.quote(p) for p in parts)
         if is_dir and not href.endswith("/"):
             href += "/"
         return href
@@ -2630,7 +2661,7 @@ class DavMixin:
                 + "".join(props) + "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>")
 
     def dav_stat(self, serial, remote):
-        if remote == HOME_DIR:
+        if remote == HOME_DIR or remote in dav_roots(serial).values():
             return {"dir": True, "size": 0, "mtime": int(time.time())}
         parent, name = posixpath.split(remote)
         for e in dav_cached_list(serial, parent):
@@ -2670,14 +2701,18 @@ class DavMixin:
                 depth = self.headers.get("Depth", "1")
                 quota = None
                 if remote == HOME_DIR:
-                    st = device_info(serial).get("storage")
-                    quota = st
+                    quota = device_info(serial).get("storage")
+                elif remote in dav_roots(serial).values():
+                    quota = next((v["storage"] for v in list_volumes(serial) if v["path"] == remote), None)
                 out = ['<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">', self.dav_prop(vol, remote, e, quota)]
                 if e["dir"] and depth != "0":
                     for c in dav_cached_list(serial, remote):
-                        if remote == HOME_DIR and c["name"] == posixpath.basename(TRASH_DIR):
+                        if c["name"] == posixpath.basename(TRASH_DIR) and (remote == HOME_DIR or remote in dav_roots(serial).values()):
                             continue
                         out.append(self.dav_prop(vol, posixpath.join(remote, c["name"]), c))
+                    if remote == HOME_DIR:
+                        for disp, vpath in dav_roots(serial).items():
+                            out.append(self.dav_prop(vol, vpath, {"name": disp, "dir": True, "size": 0, "mtime": int(time.time())}))
                 out.append("</D:multistatus>")
                 return self.dav_send(207, "".join(out).encode())
             if m in ("GET", "HEAD"):
@@ -2717,7 +2752,7 @@ class DavMixin:
             if m == "DELETE":
                 if junk:
                     return self.dav_send(204, b"")
-                if remote == HOME_DIR:
+                if remote == HOME_DIR or remote in dav_roots(serial).values():
                     return self.dav_send(403, b"")
                 if not self.dav_stat(serial, remote):
                     return self.dav_send(404, b"")
@@ -2729,7 +2764,11 @@ class DavMixin:
                 dparts = [urllib.parse.unquote(p) for p in dest_url.path.split("/")[2:]]
                 if len(dparts) < 2 or dparts[0] != vol or ".." in dparts:
                     return self.dav_send(502, b"")
-                dest = posixpath.join(HOME_DIR, *[p for p in dparts[1:] if p])
+                dparts = [p for p in dparts[1:] if p]
+                dbase = HOME_DIR
+                if dparts and dparts[0] in dav_roots(serial):
+                    dbase, dparts = dav_roots(serial)[dparts[0]], dparts[1:]
+                dest = posixpath.join(dbase, *dparts)
                 if not self.dav_stat(serial, remote):
                     return self.dav_send(404, b"")
                 exists = self.dav_stat(serial, dest) is not None
@@ -3274,8 +3313,17 @@ UI_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui.html")
 
 
 def load_page():
+    import base64
     with open(UI_FILE, encoding="utf-8") as f:
-        return f.read()
+        page = f.read()
+    # Geist (SIL Open Font License) ships next to the app and is inlined, so it works offline. System fonts are the fallback.
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(UI_FILE)), "fonts", "Geist-Variable.woff2"), "rb") as f:
+            uri = "data:font/woff2;base64," + base64.b64encode(f.read()).decode()
+        page = page.replace("/*__GEIST__*/", "@font-face{font-family:Geist;src:url(%s) format('woff2');font-weight:100 900;font-display:swap}" % uri, 1)
+    except OSError:
+        pass
+    return page
 
 if __name__ == "__main__":
     main()
