@@ -329,7 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
                              backing: .buffered, defer: false)
             w.title = "Cellar"
             w.titlebarAppearsTransparent = false
-            w.minSize = NSSize(width: 720, height: 480)
+            w.minSize = NSSize(width: 860, height: 480)
             w.contentView = wv
             w.center()
             w.setFrameAutosaveName("CellarMain")

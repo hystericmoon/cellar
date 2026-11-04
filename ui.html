@@ -90,7 +90,10 @@ tr:hover .rowact,tr:focus-within .rowact{opacity:1}
 .thumb{aspect-ratio:1;background:var(--hover);display:grid;place-items:center;color:var(--muted);overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb svg{width:34px;height:34px}
-.thumb.folder{background:var(--hover);color:var(--text)}
+.thumb.folder{background:var(--hover);color:var(--text);aspect-ratio:auto;height:84px}
+@keyframes shim{to{background-position:-200% 0}}
+.thumb:has(img){background:linear-gradient(100deg,var(--hover) 40%,var(--accent-soft) 50%,var(--hover) 60%) 0 0/200% 100%;animation:shim 1.6s linear infinite}
+@media (prefers-reduced-motion:reduce){.thumb:has(img){animation:none}}
 .tile .cap{padding:8px 10px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tile .cap small{display:block;color:var(--muted);font-size:11.5px}
 .state{max-width:520px;margin:9vh auto;text-align:center;padding:0 20px}
@@ -103,6 +106,7 @@ tr:hover .rowact,tr:focus-within .rowact{opacity:1}
 .steps li:last-child{border:0}
 .steps li::before{content:counter(s);position:absolute;left:0;top:11px;width:22px;height:22px;border-radius:50%;background:var(--hover);color:var(--text);border:1px solid var(--line);font-size:12px;font-weight:650;display:grid;place-items:center}
 code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--hover);padding:2px 6px;border-radius:5px}
+.loading{text-align:center;padding-top:12vh}.loading .spinner{margin:0 auto 12px}.loading p{margin:0;font-size:13px;padding:0 24px}
 .spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:12vh auto}
 @keyframes spin{to{transform:rotate(1turn)}}
 @media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
@@ -138,8 +142,8 @@ dialog::backdrop{background:rgba(10,12,16,.6)}
 .dhead{display:flex;align-items:center;gap:8px;padding:12px 14px 12px 18px;border-bottom:1px solid var(--line)}
 .dhead h2{font-size:14px;font-weight:600;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dhead small{color:var(--muted);font-weight:400;margin-left:8px}
-.dbody{display:grid;place-items:center;background:var(--bg);min-height:300px;max-height:calc(92vh - 58px);overflow:auto}
-.dbody img,.dbody video{max-width:100%;max-height:calc(92vh - 58px);display:block}
+.dbody{display:grid;place-items:center;background:var(--bg);min-height:300px;max-height:calc(92vh - 58px);overflow:auto;scrollbar-width:thin}
+.dbody img,.dbody video{max-width:100%;max-height:calc(92vh - 66px);display:block}
 .dbody pre{margin:0;padding:18px;width:100%;align-self:start;white-space:pre-wrap;word-break:break-word;font:12.5px/1.55 ui-monospace,Menlo,monospace}
 .dbody iframe{width:100%;height:calc(92vh - 58px);border:0;background:#fff}
 .dbody audio{margin:60px}
@@ -147,6 +151,7 @@ dialog::backdrop{background:rgba(10,12,16,.6)}
 .btn.full{width:100%;justify-content:center}
 .btn.quiet{border-color:transparent;color:var(--muted);height:28px;font-size:12.5px}
 .btn.quiet:hover{color:var(--text)}
+.btn.quiet.rm{color:var(--danger)}.btn.quiet.rm:hover{background:var(--hover);color:var(--danger)}
 .tiny{margin:-6px 2px 0;font-size:12px;color:var(--muted)}
 .conn{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);padding:7px 9px;border-radius:8px;background:var(--hover)}
 .conn.on{background:var(--hover);color:var(--ok)}
@@ -237,6 +242,7 @@ body.selecting #dock{bottom:84px}
 .tx-foot{display:flex;justify-content:flex-end;padding:4px 8px}
 #transfers.collapsed #txList,#transfers.collapsed .tx-foot{display:none}
 dialog.small{width:min(520px,94vw)}
+#mrScreen>p,#mrCamera>p{margin:0 0 14px}#mrScreen,#mrCamera{display:grid;gap:12px;min-height:18.5rem;align-content:start}#mrCamera .field{margin-top:2px}
 .cbody{padding:20px 22px;display:grid;gap:14px}
 .cbody h2{margin:0;font-size:16px;letter-spacing:-.01em}
 .cbody p{margin:0}
@@ -264,7 +270,8 @@ dialog.small{width:min(520px,94vw)}
 .row2{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .srcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
 .srcs label{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;cursor:pointer}
-.srcs label small{display:block;color:var(--muted);font-size:12px}
+.srcs label small{display:block;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.srcs label{min-width:0}.srcs label>span{min-width:0}
 .srcs label.off{opacity:.5;cursor:default}
 .srcs input{accent-color:var(--accent);margin:2px 0 0}
 .pathbox{display:flex;gap:8px;align-items:center}
@@ -644,7 +651,8 @@ window.addEventListener("popstate", () => { if (S.serial) routeFromHash(true); }
 function beginLoad(token) {
   S.loadToken = token; S.sel.clear(); anchor = null; closeMenu();
   $("#content").setAttribute("aria-busy", "true"); S.loading = true;
-  setTimeout(() => { if (S.loading && S.loadToken === token) $("#content").innerHTML = '<div class="spinner" role="progressbar" aria-label="Loading"></div>'; }, 150);
+  setTimeout(() => { if (S.loading && S.loadToken === token) $("#content").innerHTML = '<div class="loading" role="status"><div class="spinner"></div><p class="muted" id="loadTxt">Loading…</p></div>'; }, 150);
+  setTimeout(() => { const t = $("#loadTxt"); if (t && S.loading && S.loadToken === token) t.textContent = "Still working. Scanning a full phone can take a minute, and you can keep using Cellar."; }, 6000);
 }
 function endLoad(token) { if (S.loadToken === token) { S.loading = false; $("#content").removeAttribute("aria-busy"); } }
 
@@ -692,7 +700,16 @@ async function showView(v, replace) {
 }
 const stateHTML = (icon, title, body, extra = "") => `<div class="state"><div class="big">${svg(icon)}</div><h1>${title}</h1><p>${body}</p>${extra}</div>`;
 
+function syncToolbar() {
+  // File controls only make sense where there are files: page views hide them all, Recent/Trash/Search hide the ones that create things.
+  const page = isPage(), listing = S.mode === "folder";
+  $("#upBtn").hidden = !listing;
+  $(".seg").hidden = page;
+  $("#newFolderBtn").hidden = !listing;
+  $("#addBtn").hidden = !listing;
+}
 function renderCrumbs() {
+  syncToolbar();
   const c = $("#crumbs");
   $("#upBtn").disabled = S.mode !== "folder" || S.path === "/";
   if (S.mode !== "folder") {
@@ -1348,10 +1365,10 @@ async function renderApps(token) {
   $("#content").innerHTML = `<div class="page">
     <div class="row2"><div><h1>Apps</h1><p class="muted">Apps you installed on the phone. Drop an .apk file here to install it.</p></div>
       <button class="btn primary" type="button" id="apkBtn">Install app…</button><input type="file" id="apkInput" accept=".apk" multiple hidden></div>
-    ${r.apps.length ? `<table><colgroup><col><col style="width:32%"><col style="width:90px"><col style="width:90px"><col style="width:190px"></colgroup>
+    ${r.apps.length ? `<table><colgroup><col><col style="width:30%"><col style="width:120px"><col style="width:84px"><col style="width:190px"></colgroup>
     <thead><tr><th>Name</th><th>App ID</th><th class="num">Version</th><th class="num">Size</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
-    ${r.apps.map(a => `<tr><td><span class="name" style="cursor:default"><span class="ico">${svg("apk")}</span><span>${esc(a.name)}</span></span></td><td class="where">${esc(a.pkg)}</td><td class="num">${esc(a.version || "—")}</td><td class="num">${a.size ? fmtSize(a.size) : "—"}</td>
-      <td class="act" style="opacity:1"><button class="btn" type="button" data-appsave="${esc(a.pkg)}">Save to Mac</button><button class="btn quiet" type="button" data-appdel="${esc(a.pkg)}" data-name="${esc(a.name)}">Uninstall</button></td></tr>`).join("")}
+    ${r.apps.map(a => `<tr><td><span class="name" style="cursor:default"><span class="ico">${svg("apk")}</span><span title="${esc(a.name)}">${esc(a.name)}</span></span></td><td class="where" title="${esc(a.pkg)}">${esc(a.pkg)}</td><td class="num" title="Version code ${esc(a.version || "")}">${esc(a.version || "—")}</td><td class="num">${a.size ? fmtSize(a.size) : "—"}</td>
+      <td class="act" style="opacity:1"><button class="btn" type="button" data-appsave="${esc(a.pkg)}">Save to Mac</button><button class="btn quiet rm" type="button" data-appdel="${esc(a.pkg)}" data-name="${esc(a.name)}">Uninstall</button></td></tr>`).join("")}
     </tbody></table>` : stateHTML("apk", "No apps installed", "Only apps you installed yourself are listed here.")}</div>`;
   $("#apkBtn").onclick = () => $("#apkInput").click();
   $("#apkInput").onchange = e => { installFiles([...e.target.files]); e.target.value = ""; };
@@ -1400,7 +1417,7 @@ async function renderMirror(msg) {
       <label class="toggle"><input type="checkbox" id="mrCamRec"><span><b>Record to a video on your Mac</b><small>Saved in Downloads/Cellar when you close the window.</small></span></label></div>
     <div class="cbtns"><span class="grow"></span><button class="btn primary" type="button" id="mrStart">Start mirroring</button></div>`;
   const pick = cam => { if (cam && !camOk) return toast(camWhy || "The camera isn't available on this phone.", {err:true});
-    $("#mrScreen").hidden = cam; $("#mrCamera").hidden = !cam; $("#mrStart").textContent = cam ? "Start camera" : "Start mirroring";
+    $("#mrScreen").hidden = cam; $("#mrCamera").hidden = !cam; $("#mrTitle").textContent = cam ? "Use the phone camera" : "Mirror the phone screen"; $("#mrStart").textContent = cam ? "Start camera" : "Start mirroring";
     [["mrScreenTab", !cam], ["mrCamTab", cam]].forEach(([id, on]) => { $("#" + id).setAttribute("aria-checked", on); $("#" + id).setAttribute("aria-selected", on); }); };
   $("#mrScreenTab").onclick = () => pick(false); $("#mrCamTab").onclick = () => pick(true);
   $("#mrStart").onclick = async () => {
@@ -1795,7 +1812,7 @@ async function renderSync(token) {
       ${p.last_error ? `<p class="note bad">${esc(p.last_error)} Run it again to retry.</p>` : ""}
       ${(p.conflicts || []).length ? `<div class="conflicts" role="group" aria-label="Conflicts in ${esc(p.name)}"><b>Changed on both sides (${p.conflicts.length})</b><p class="note" style="margin:2px 0 6px">The newer file kept its name. The older one is saved next to it, on both the Mac and the phone, so you can choose.</p>
         <ul>${p.conflicts.map(c => `<li><code>${esc(c.rel)}</code> → older version saved as <code>${esc(c.kept)}</code></li>`).join("")}</ul><button class="btn" type="button" data-sydismiss="${esc(p.id)}">Got it</button></div>` : ""}
-      <label class="toggle"><input type="checkbox" data-syauto="${esc(p.id)}" ${p.auto ? "checked" : ""} ${p.confirmed ? "" : "disabled"}><span><b>Sync automatically when this phone connects</b><small>${p.confirmed ? "If a sync would remove lots of files, Cellar pauses and asks you first." : "Available after the first sync."}</small></span></label></section>`).join("") : `<section class="panel">${stateHTML("sync", "No folders paired yet", "Pair a folder on your Mac with one on the phone, for example Documents, to keep them the same.")}</section>`}</div>`;
+      <label class="toggle"><input type="checkbox" data-syauto="${esc(p.id)}" ${p.auto ? "checked" : ""} ${p.confirmed ? "" : "disabled"}><span><b>Sync automatically when this phone connects</b><small>${p.confirmed ? "If a sync would remove lots of files, Cellar pauses and asks you first." : "Available after the first sync."}</small></span></label></section>`).join("") : `<section class="panel" id="syEmpty">${stateHTML("sync", "No folders paired yet", "Pair a folder on your Mac with one on the phone, for example Documents, to keep them the same.")}</section>`}</div>`;
   $("#syAdd").onclick = () => showSyncForm();
   document.querySelectorAll("[data-sypreview]").forEach(b => b.onclick = () => showSyncPreview(b.dataset.sypreview));
   document.querySelectorAll("[data-syauto]").forEach(b => b.onchange = () => postJSON("/api/sync/pairs/update", {id: b.dataset.syauto, auto: b.checked}).catch(e => { toast(e.message, {err:true}); b.checked = !b.checked; }));
@@ -1805,13 +1822,13 @@ async function renderSync(token) {
     try { await postJSON("/api/sync/pairs/delete", {id: b.dataset.syremove}); renderSync(S.loadToken); } catch(e) { toast(e.message, {err:true}); } });
 }
 function showSyncForm() {
-  const f = $("#syForm"); f.hidden = false;
+  const f = $("#syForm"); f.hidden = false; const ad = $("#syAdd"); if (ad) ad.hidden = true; const em = $("#syEmpty"); if (em) em.hidden = true;
   f.innerHTML = `<section class="panel" aria-labelledby="syNew"><h2 id="syNew">New folder pair</h2>
     <label class="field">Folder on your Mac<span class="pathbox"><input id="syMac" placeholder="~/Documents/Notes" autocomplete="off"><button class="btn" type="button" id="syMacPick">Choose…</button></span></label>
-    <label class="field">Folder on the phone<span class="pathbox"><input id="syPhone" placeholder="${esc(HOME)}/Documents/Notes" autocomplete="off" value="${esc(HOME)}/"><button class="btn" type="button" id="syPhonePick">Browse…</button></span></label>
+    <label class="field">Folder on the phone<span class="pathbox"><input id="syPhone" placeholder="${esc(HOME)}/Documents/Notes" autocomplete="off"><button class="btn" type="button" id="syPhonePick">Browse…</button></span></label>
     <div id="syBrowse" hidden></div>
     <div class="cbtns"><span class="grow"></span><button class="btn" type="button" id="syCancel">Cancel</button><button class="btn primary" type="button" id="syCreate">Next: see what would change</button></div></section>`;
-  $("#syCancel").onclick = () => { f.hidden = true; f.innerHTML = ""; };
+  $("#syCancel").onclick = () => { f.hidden = true; f.innerHTML = ""; const ad = $("#syAdd"); if (ad) ad.hidden = false; const em = $("#syEmpty"); if (em) em.hidden = false; };
   $("#syMacPick").onclick = async () => { try { const r = await api("/api/pickfolder", {prompt:"Choose the folder on your Mac to sync"}, {method:"POST"}); if (r.path) $("#syMac").value = r.path; } catch(e) { toast(e.message, {err:true}); } };
   $("#syPhonePick").onclick = () => browsePhone($("#syPhone").value.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || HOME);
   $("#syCreate").onclick = async () => { const b = $("#syCreate"); b.disabled = true;
