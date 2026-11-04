@@ -1183,7 +1183,59 @@ def scan_space(sc):
     }
 
 
-SCAN_RUNNERS = {"space": scan_space}
+def _visible_path(p, root):
+    return not any(part.startswith(".") for part in p[len(root):].split("/") if part)
+
+
+def scan_dupes(sc):
+    """Same size first (cheap), then a checksum on the phone for files that share a size."""
+    serial, root = sc["serial"], sc["root"]
+    sc["progress"] = "Looking through your files…"
+    rows = [r for r in scan_find_files(sc) if int(r[0]) > 0 and _visible_path(r[2], root)]
+    scan_check(sc)
+    by_size = {}
+    for size, mtime, path in rows:
+        by_size.setdefault(int(size), []).append((int(mtime), path))
+    cands = {k: v for k, v in by_size.items() if len(v) > 1}
+    files = [(k, m, p) for k, v in cands.items() for m, p in v]
+    total_bytes = sum(k for k, _, _ in files) or 1
+    tool = sh(serial, "command -v md5sum >/dev/null 2>&1 && echo md5sum || echo 'toybox md5sum'").strip() or "md5sum"
+    hashes, done_bytes = {}, 0
+    batch = []
+
+    def flush():
+        nonlocal done_bytes
+        if not batch:
+            return
+        out = sh(serial, f"{tool} " + " ".join(q(p) for _, _, p in batch) + " 2>/dev/null", timeout=1800)
+        for line in out.splitlines():
+            if len(line) > 34 and re.fullmatch(r"[0-9a-f]{32}", line[:32]):
+                hashes[line[34:]] = line[:32]
+        done_bytes += sum(k for k, _, _ in batch)
+        sc["progress"] = f"Comparing {len(files):,} files that share a size… {int(done_bytes / total_bytes * 100)}%"
+        batch.clear()
+    for f in sorted(files, key=lambda f: f[2]):
+        scan_check(sc)
+        batch.append(f)
+        if len(batch) >= 40 or sum(k for k, _, _ in batch) > 400_000_000:
+            flush()
+    flush()
+    groups = {}
+    for size, mtime, path in files:
+        h = hashes.get(path)
+        if h:
+            groups.setdefault((size, h), []).append({"path": path, "name": posixpath.basename(path), "mtime": mtime, "size": size, "dir": False})
+    out = []
+    for (size, h), fl in groups.items():
+        if len(fl) > 1:
+            fl.sort(key=lambda f: (f["mtime"], len(f["path"])))   # oldest first: the likely original
+            out.append({"hash": h, "size": size, "type": type_of(fl[0]["name"]), "files": fl, "wasted": size * (len(fl) - 1)})
+    out.sort(key=lambda g: -g["wasted"])
+    return {"root": root, "at": int(time.time()), "scanned": len(rows), "groups": out[:300], "wasted": sum(g["wasted"] for g in out),
+            "unchecked": len(files) - len(hashes) if files else 0}
+
+
+SCAN_RUNNERS = {"space": scan_space, "dupes": scan_dupes}
 
 
 # ---------------------------------------------------------------- thumbnails

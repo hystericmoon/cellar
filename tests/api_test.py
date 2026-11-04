@@ -111,3 +111,15 @@ ok(sum(t["bytes"] for t in r["types"])==r["total"], "type totals add up")
 ok(not any(".CellarTrash" in e["path"] or "/Android/data" in e["path"] for e in r["biggest"]), "Trash and protected folders left out")
 sc=scan("space", SD); ok(sc["state"]=="done" and sc["result"]["files"]>=1 and all(e["path"].startswith(SD) for e in sc["result"]["biggest"]), "space scan on the SD card stays on the card")
 r=call("/api/scan","POST",{"kind":"nope"}); ok("Unknown" in r.get("error",""), "unknown scan refused")
+# --- step 3: duplicates
+D=H+"/Documents"
+open(D+"/dupA.bin","wb").write(b"A"*5000); open(D+"/dupB.bin","wb").write(b"A"*5000); open(D+"/dupC.bin","wb").write(b"A"*4999+b"B"); open(D+"/Work/dupA copy.bin","wb").write(b"A"*5000)
+os.utime(D+"/dupA.bin",(1_700_000_000,1_700_000_000))
+sc=scan("dupes"); r=sc["result"]; ok(sc["state"]=="done", f"dupes scan {sc['state']} {sc.get('error')}")
+g=[x for x in r["groups"] if x["files"][0]["name"]=="dupA.bin"]
+ok(len(g)==1 and len(g[0]["files"])==3 and {f["name"] for f in g[0]["files"]}=={"dupA.bin","dupB.bin","dupA copy.bin"}, f"identical files grouped: {[f['name'] for f in g[0]['files']] if g else None}")
+ok(not any(f["name"]=="dupC.bin" for x in r["groups"] for f in x["files"]), "same size but different content is not a duplicate")
+ok(g and g[0]["files"][0]["name"]=="dupA.bin" and g[0]["wasted"]==10000, "oldest copy first, wasted = size x (copies-1)")
+ok(any(x["files"][0]["name"] in ("report.pdf",) for x in r["groups"]) and r["groups"][0]["wasted"]>=r["groups"][-1]["wasted"], "biggest waste first")
+ok(not any(f["name"].startswith(".") for x in r["groups"] for f in x["files"]), "hidden files ignored")
+for n in ("dupA.bin","dupB.bin","dupC.bin","Work/dupA copy.bin"): os.remove(D+"/"+n)

@@ -292,6 +292,10 @@ dialog.small{width:min(520px,94vw)}
 .floose{display:flex;justify-content:space-between;padding:9px 4px;border-top:1px solid var(--line);color:var(--muted)}
 .spbar{display:flex;gap:8px;flex-wrap:wrap}
 .scanning{justify-items:center}
+.dupe{display:flex;align-items:center;gap:12px;padding:6px 4px;border-radius:6px;cursor:pointer}.dupe:hover{background:var(--hover)}.dupe img{width:40px;height:40px;object-fit:cover;border-radius:6px;flex:none}
+.dpname{flex:1;min-width:0;display:grid}.dpname b{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dpname small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dpwhy{font-size:12.5px;color:var(--muted);min-width:90px;text-align:right}.dupe input:checked~.dpwhy{color:var(--ok);font-weight:600}
+.group legend{font-weight:600;padding:0 6px}.group input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
@@ -606,9 +610,11 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
+I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
+I.check = '<path d="m5 12 5 5 9-10"/>';
 I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
@@ -1621,6 +1627,48 @@ async function saveThenTrash(list, r) {
   } catch(e) { toast(e.message, {err:true}); }
 }
 PAGES.space = renderSpace;
+
+/* ---------- Duplicate files ---------- */
+const DUPES = {root: null, cache: {}, keep: {}};
+async function renderDupes(token, force) {
+  const root = DUPES.root && (DUPES.root === HOME || VOLS.some(v => v.path === DUPES.root)) ? DUPES.root : HOME; DUPES.root = root;
+  const key = S.serial + "|" + root; let r = !force && DUPES.cache[key];
+  if (!r) {
+    $("#content").innerHTML = scanBusy("Duplicate files", "Looking through your files…", "dpProg");
+    try { r = await runScan("dupes", root, {}, token, sc => { const el = $("#dpProg"); if (el) el.textContent = sc.progress; }); }
+    catch(e) { if (e.message === "cancelled" || S.loadToken !== token) return; $("#content").innerHTML = stateHTML("copy", "Couldn’t look for duplicates", esc(e.message), `<button class="btn" type="button" id="dpRetry">Try again</button>`); $("#dpRetry").onclick = () => renderDupes(S.loadToken, true); return; }
+    DUPES.cache[key] = r; DUPES.keep[key] = {};
+  }
+  if (S.loadToken !== token) return;
+  drawDupes(r, key);
+}
+function drawDupes(r, key) {
+  const keep = DUPES.keep[key];   // group index -> index of the copy to keep (default 0, the oldest)
+  const toTrash = () => r.groups.flatMap((g, gi) => g.files.filter((_, fi) => fi !== (keep[gi] || 0)));
+  $("#content").innerHTML = `<div class="page">
+    <div class="row2"><div><h1>Duplicate files</h1><p class="muted" style="margin:4px 0 0">Files with exactly the same content. Choose the copy to keep in each group. The others go to the Trash, where you can put them back for 30 days.</p></div>
+      <button class="btn" type="button" id="dpAgain">Scan again</button></div>
+    ${rootTabs(r.root, "data-dproot")}
+    ${r.groups.length ? `<section class="panel"><div class="row2"><div><div class="bignum" id="dpTot">${fmtSize(r.wasted)}<small>wasted by ${r.groups.length} group${r.groups.length === 1 ? "" : "s"} of duplicates</small></div></div>
+      <button class="btn primary" type="button" id="dpGo"></button></div></section>
+    ${r.groups.map((g, gi) => `<fieldset class="group"><legend>${esc(g.files[0].name)}<small class="muted"> · ${fmtSize(g.size)} each · ${g.files.length} copies</small></legend>
+      ${g.files.map((f, fi) => `<label class="dupe"><input type="radio" name="dp${gi}" value="${fi}" ${fi === (keep[gi] || 0) ? "checked" : ""}>
+        ${g.type === "Photos" ? `<img src="${esc(thumbUrl(f, 96))}" alt="" loading="lazy" width="40" height="40">` : `<span class="ico">${svg(kind(f))}</span>`}
+        <span class="dpname"><b>${esc(f.name)}</b><small title="${esc(f.path)}">${esc(placeLabel(parentOf(f.path)))} · ${fmtDate(f.mtime)}</small></span><span class="dpwhy">${fi === (keep[gi] || 0) ? "Keep" : "Move to Trash"}</span></label>`).join("")}
+    </fieldset>`).join("")}` : `<section class="panel">${stateHTML("check", "No duplicates found", `Looked at ${r.scanned.toLocaleString()} files in ${esc(rootLabel(r.root))}. Every file has different content.`)}</section>`}</div>`;
+  document.querySelectorAll("[data-dproot]").forEach(b => b.onclick = () => { DUPES.root = b.dataset.dproot; showView("dupes", true); });
+  $("#dpAgain").onclick = () => { delete DUPES.cache[key]; renderDupes(S.loadToken); };
+  if (!r.groups.length) return;
+  const sync = () => { const l = toTrash(), sz = l.reduce((a, f) => a + f.size, 0);
+    $("#dpGo").textContent = `Move ${l.length} duplicate${l.length === 1 ? "" : "s"} to Trash · ${fmtSize(sz)}`; };
+  sync();
+  document.querySelectorAll(".group input[type=radio]").forEach(b => b.onchange = () => { keep[+b.name.slice(2)] = +b.value;
+    b.closest("fieldset").querySelectorAll("label.dupe").forEach((l, i) => l.querySelector(".dpwhy").textContent = i === +b.value ? "Keep" : "Move to Trash"); sync(); });
+  $("#dpGo").onclick = async () => { const l = toTrash();
+    if (!await confirmDialog(`Move ${l.length} duplicate${l.length === 1 ? "" : "s"} to the Trash?`, `One copy of each file stays where it is. ${fmtSize(l.reduce((a, f) => a + f.size, 0))} moves to the Trash on the phone and is deleted for good after ${S.trashDays || 30} days.`, "Move to Trash")) return;
+    await trashEntries(l); delete DUPES.cache[key]; };
+}
+PAGES.dupes = renderDupes;
 
 /*__NEWPAGES__*/
 
