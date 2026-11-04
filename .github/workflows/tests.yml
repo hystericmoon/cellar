@@ -1,0 +1,27 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install Playwright and Chromium
+        run: |
+          npm init -y >/dev/null
+          npm i playwright
+          npx playwright install --with-deps chromium
+      - name: Run both suites against the fake phone
+        run: |
+          # setup_fake_phone.py and reset.py write to /storage and /data/app, so they need root on this throwaway runner.
+          sudo mkdir -p /storage /data && sudo chown -R "$USER" /storage /data
+          chmod +x tests/run_all.sh tests/fakebin/*
+          NODE_PATH="$PWD/node_modules" tests/run_all.sh
+      - name: Show server log on failure
+        if: failure()
+        run: tail -n 80 tests/server.log || true
