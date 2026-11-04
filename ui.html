@@ -233,7 +233,9 @@ body.selecting #dock{bottom:84px}
 #txList .st{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 #txList .st.ok{color:var(--ok);font-weight:600}
 #txList .st.err{color:var(--danger);font-weight:600}
+#txList{overflow-x:hidden}
 #txList .r2{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#txList li{min-width:0}#txList .r2{min-width:0}#txList .r2>span:first-child{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#txList .r2>span:last-child:not(:first-child){flex:none;white-space:nowrap}
 #txList .r2 button{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer;font-size:12px}
 #txList .x{width:24px;height:24px;border-radius:6px;border:0;background:none;cursor:pointer;color:var(--muted);flex:none}
 #txList .x:hover{background:var(--hover);color:var(--text)}
