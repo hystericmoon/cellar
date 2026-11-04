@@ -109,5 +109,17 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(9, 9, 11)', 'dark mode is zinc-950');
     await p.emulateMedia({colorScheme:'light'});
   });
+  await step('sd-card', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#places button[data-path="/storage/1A2B-3C4D"]', {timeout:8000});
+    ok(await p.textContent('#places button[data-path="/storage/1A2B-3C4D"]') === 'SD card', 'SD card appears in the sidebar');
+    await p.click('#places button[data-path="/storage/1A2B-3C4D"]'); await p.click('[data-view=list]'); await p.waitForSelector(row('Documents'));
+    ok((await p.textContent('#crumbs button')).trim() === 'SD card', 'breadcrumb starts at "SD card"');
+    await p.click(row('Documents') + ' button.name'); await p.waitForSelector(row('sd-notes.txt'));
+    await p.click(row('sd-notes.txt') + ' td.ck input.sel', {force:true}); await p.click('#selTrash'); await p.waitForSelector('.toast:has-text("Trash")');
+    ok(fs.existsSync('/storage/1A2B-3C4D/.CellarTrash') && !fs.existsSync(R + '/.CellarTrash/' + 'x'), 'Trash on the card stays on the card');
+    await p.click('.toast:has-text("Trash") button'); await p.waitForTimeout(2500);
+    ok(fs.existsSync('/storage/1A2B-3C4D/Documents/sd-notes.txt'), 'Undo puts it back on the card');
+    await p.screenshot({path:__dirname + '/shots/sd.png'});
+  });
   console.log('errors:', errs); await b.close();
 })();

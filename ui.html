@@ -422,6 +422,7 @@ const I = {
   archive:'<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
   apk:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
   file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  sd:'<path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M9 7v3M12 7v3M15 7v3"/>',
   home:'<path d="m3 11 9-8 9 8M5 10v10h14V10"/>', camera:'<path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
   download:'<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>', phone:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
   plug:'<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>', lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
@@ -440,7 +441,18 @@ const PLACE_DEFS = [["Internal storage",[""],"home"],["Camera",["DCIM/Camera"],"
   ["Pictures",["Pictures"],"image"],["Downloads",["Download"],"download"],["Documents",["Documents"],"text"],
   ["Music",["Music"],"audio"],["Movies",["Movies"],"video"],["WhatsApp media",["Android/media/com.whatsapp/WhatsApp/Media","WhatsApp/Media"],"folder"]];
 let PLACES = PLACE_DEFS.map(([l, rels, ic]) => [l, rels[0], ic]);
+let VOLS = [];   // SD cards and USB drives: {path, name, storage}
+const rootOf = p => (VOLS.find(v => p === v.path || p.startsWith(v.path + "/")) || {}).path || HOME;
+const rootLabel = r => r === HOME ? "Internal storage" : ((VOLS.find(v => v.path === r) || {}).name || baseName(r));
+async function refreshVolumes() {
+  if (!S.serial || !S.ready) return;
+  try { const v = (await api("/api/volumes")).volumes; const sig = JSON.stringify(v);
+    if (sig !== JSON.stringify(VOLS)) { VOLS = v; renderPlaces();
+      if (S.mode === "folder" && S.path.startsWith("/storage/") && rootOf(S.path) === HOME && !S.path.startsWith(HOME + "/") && S.path !== HOME) { toast("That drive was removed.", {ms:5000}); go(HOME); } } } catch(e) {}
+}
+setInterval(refreshVolumes, 10000);
 async function resolvePlaces() {
+  refreshVolumes();
   const all = PLACE_DEFS.flatMap(d => d[1].filter(Boolean).map(r => HOME + "/" + r));
   let have; try { have = new Set((await api("/api/exists", {paths: all.join("\n")})).exist); } catch(e) { return; }
   PLACES = PLACE_DEFS.map(([l, rels, ic]) => { if (!rels[0]) return [l, "", ic]; const r = rels.find(x => have.has(HOME + "/" + x)); return r ? [l, r, ic] : null; }).filter(Boolean);
@@ -570,7 +582,7 @@ function renderState() {
 const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
-const placeLabel = p => p === HOME ? "Internal storage" : baseName(p) || "/";
+const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
 const LIB = [["recent","Recent","clock"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
@@ -617,7 +629,7 @@ async function showSearch(q, replace) {
   S.mode = "search"; S.query = q; S.filter = ""; $("#filter").value = q;
   setHash("#" + encodeURIComponent(":search:" + q), replace); renderCrumbs(); renderPlaces(); renderHint();
   const token = "s:" + q + Date.now(); beginLoad(token);
-  try { const r = await api("/api/search", {q}); if (S.loadToken !== token) return; S.entries = r.entries; render(); }
+  try { const r = await api("/api/search", {q, root: rootOf(S.path || HOME)}); if (S.loadToken !== token) return; S.entries = r.entries; render(); }
   catch(e) { if (S.loadToken === token) $("#content").innerHTML = stateHTML("search", "Couldn't search", esc(e.message)); }
   finally { endLoad(token); }
 }
@@ -644,23 +656,26 @@ function renderCrumbs() {
     const label = S.mode === "search" ? `Search: “${S.query}”` : (LIB.find(l => l[0] === S.mode) || [0, ""])[1];
     c.innerHTML = `<button type="button" aria-current="page">${esc(label)}</button>`; document.title = label + " · Cellar"; return;
   }
-  const rel = S.path.startsWith(HOME) ? S.path.slice(HOME.length) : S.path;
-  const parts = rel.split("/").filter(Boolean); const base = S.path.startsWith(HOME) ? HOME : "";
-  let html = `<button type="button" data-path="${esc(base || "/")}" data-drop="${esc(base || "/")}">${S.path.startsWith(HOME) ? "Internal storage" : "/"}</button>`; let acc = base;
+  const root = rootOf(S.path), inRoot = S.path === root || S.path.startsWith(root + "/");
+  const rel = inRoot ? S.path.slice(root.length) : S.path;
+  const parts = rel.split("/").filter(Boolean); const base = inRoot ? root : "";
+  let html = `<button type="button" data-path="${esc(base || "/")}" data-drop="${esc(base || "/")}">${inRoot ? esc(rootLabel(root)) : "/"}</button>`; let acc = base;
   parts.forEach(p => { acc += "/" + p; html += `<span class="sep" aria-hidden="true">/</span><button type="button" data-path="${esc(acc)}" data-drop="${esc(acc)}">${esc(p)}</button>`; });
   c.innerHTML = html; const last = c.lastElementChild; if (last) last.setAttribute("aria-current", "page");
-  document.title = (parts[parts.length-1] || "Internal storage") + " · Cellar";
+  document.title = (parts[parts.length-1] || rootLabel(root)) + " · Cellar";
 }
 $("#crumbs").onclick = e => { const b = e.target.closest("button[data-path]"); if (b) go(b.dataset.path); };
 async function nearestExisting(p) { let cur = parentOf(p);
-  while (cur.startsWith(HOME) && cur !== HOME) { try { await api("/api/ls", {path:cur}); return cur; } catch(e) { cur = parentOf(cur); } }
-  return HOME; }
+  const root = rootOf(p);
+  while (cur.startsWith(root) && cur !== root) { try { await api("/api/ls", {path:cur}); return cur; } catch(e) { cur = parentOf(cur); } }
+  return root; }
 const goUp = () => { if (S.mode === "folder" && S.path !== "/") go(parentOf(S.path), false, {focus: S.path}); };
 $("#upBtn").onclick = goUp;
 
 function renderPlaces() {
-  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => { const p = rel ? HOME + "/" + rel : HOME;
-    return `<li><button type="button" data-path="${esc(p)}" data-drop="${esc(p)}" aria-current="${S.mode === "folder" && S.path === p}">${svg(ic)}<span>${esc(label)}</span></button></li>`; }).join("");
+  const place = (label, p, ic, tip) => `<li><button type="button" data-path="${esc(p)}" data-drop="${esc(p)}" aria-current="${S.mode === "folder" && S.path === p}"${tip ? ` title="${esc(tip)}"` : ""}>${svg(ic)}<span>${esc(label)}</span></button></li>`;
+  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => place(label, rel ? HOME + "/" + rel : HOME, ic)).join("")
+    + VOLS.map(v => place(v.name, v.path, "sd", v.storage ? `${fmtSize(v.storage.free)} free of ${fmtSize(v.storage.total)}` : "")).join("");
   $("#library").innerHTML = LIB.map(([v, label, ic]) => `<li><button type="button" data-lib="${v}" aria-current="${S.mode === v}">${svg(ic)}<span>${label}</span></button></li>`).join("");
 }
 $("#places").onclick = e => { const b = e.target.closest("button[data-path]"); if (!b) return;

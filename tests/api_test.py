@@ -74,3 +74,24 @@ sid3="ab12cd3400"; call("/api/stage","POST",raw=b"apk",id=sid3,rel="game.apk"); 
 # thumbs
 r=urllib.request.urlopen(f"{B}/api/thumb?s=FAKE123&path={urllib.parse.quote(H+'/DCIM/Camera/PXL_20261100_12340.png')}&m=1&z=2&t={TOK}"); ok(r.status==200 and len(r.read())>100 and "max-age" in r.headers["Cache-Control"], "thumbnail served+cached")
 print(call("/api/tools"), call("/api/settings"))
+# --- step 1: SD cards and USB drives
+SD="/storage/1A2B-3C4D"
+v=call("/api/volumes")["volumes"]; ok(len(v)==1 and v[0]["path"]==SD and v[0]["name"]=="SD card" and v[0]["storage"]["total"]>0, f"volumes {v}")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import importlib.util
+spec=importlib.util.spec_from_file_location("cellar_mod", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cellar.py"))
+cm=importlib.util.module_from_spec(spec); spec.loader.exec_module(cm)
+pv=cm.parse_volumes("public:179,65 mounted 1A2B-3C4D\npublic:8,1 mounted 0123-4567\npublic:8,17 unmounted 9999-AAAA\nemulated;0 mounted null\n")
+ok(pv=={"1A2B-3C4D":"SD card","0123-4567":"USB drive"}, f"parse_volumes sm output {pv}")
+ok(cm.parse_volumes("", "emulated self 1A2B-3C4D")=={"1A2B-3C4D":"SD card or USB drive"}, "parse_volumes falls back to /storage names")
+r=call("/api/trash","POST",{"paths":[SD+"/Documents/sd-notes.txt", H+"/Documents/hi.txt"]})
+ok(len(r["items"])==2 and not os.path.exists(SD+"/Documents/sd-notes.txt") and os.path.isdir(SD+"/.CellarTrash") and len(os.listdir(SD+"/.CellarTrash"))>=2, "trash on the card stays on the card")
+ok(not any("sd-notes" in n for n in os.listdir(H+"/.CellarTrash")), "card items are not copied to internal storage")
+t=call("/api/trash"); ok({e["name"] for e in t["entries"]}=={"sd-notes.txt","hi.txt"}, f"trash lists both drives {[e['name'] for e in t['entries']]}")
+r2=call("/api/untrash","POST",{"ids":[e["id"] for e in t["entries"]]}); ok(os.path.exists(SD+"/Documents/sd-notes.txt") and os.path.exists(H+"/Documents/hi.txt"), f"put back to the right drive {r2}")
+r=call("/api/trash","POST",{"paths":[SD]}); ok("can't" in r.get("error",""), "can't trash a drive's root")
+r=call("/api/search",q="sd-notes",root=SD); ok([e["name"] for e in r["entries"]]==["sd-notes.txt"], "search inside the card")
+r=call("/api/search",q="sd-notes"); ok(r["entries"]==[], "internal search doesn't leak card files")
+os.utime(SD+"/Documents/sd-notes.txt")
+r=call("/api/recent"); ok(any(e["path"].startswith(SD) for e in r["entries"]), "recent includes the card")
+call("/api/trash/empty","POST",{})

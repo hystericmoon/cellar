@@ -33,4 +33,9 @@ for pkg, files in {"com.whatsapp-1": {"base.apk": 300_000}, "org.telegram.messen
     os.makedirs(f"/data/app/{pkg}", exist_ok=True)
     for n, size in files.items():
         open(f"/data/app/{pkg}/{n}", "wb").write(os.urandom(size))
+SD = "/storage/1A2B-3C4D"   # simulated SD card, mounted by tests/fakebin/sm
+for d in ["DCIM/Camera", "Music", "Documents"]:
+    os.makedirs(os.path.join(SD, d), exist_ok=True)
+open(f"{SD}/DCIM/Camera/SD_0001.png", "wb").write(png(400, 300, cols[1]))
+open(f"{SD}/Documents/sd-notes.txt", "w").write("on the card")
 print("Fake phone ready at", R)

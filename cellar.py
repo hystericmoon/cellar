@@ -857,8 +857,67 @@ def phone_mkdir(serial, folder, name=""):
     return {"path": target, "name": name}
 
 
-def trash_read(serial):
-    out = sh(serial, f"cat {q(TRASH_DIR + '/.index')} 2>/dev/null")
+_UUID = re.compile(r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|[0-9A-Fa-f-]{8,36}")
+
+
+def parse_volumes(sm_out, ls_out=""):
+    """SD cards and USB drives from `sm list-volumes public` (fallback: names under /storage)."""
+    vols = {}
+    for line in sm_out.splitlines():
+        m = re.match(r"public:(\d+),\d+\s+(\w+)\s+(\S+)", line.strip())
+        if m and m.group(2) == "mounted" and _UUID.fullmatch(m.group(3)):
+            # Disk major 179 is an SD card reader; 8 is a USB (SCSI) disk.
+            vols[m.group(3)] = "SD card" if m.group(1) == "179" else "USB drive"
+    if not vols:
+        for name in ls_out.split():
+            if _UUID.fullmatch(name) and "-" in name:
+                vols[name] = "SD card or USB drive"
+    return vols
+
+
+def list_volumes(serial):
+    out = sh(serial, "sm list-volumes public 2>/dev/null; echo __LS__; ls /storage 2>/dev/null; echo __DF__; "
+                     "for d in /storage/*-*; do [ -d \"$d\" ] && echo \"$d $(df -k \"$d\" 2>/dev/null | tail -n 1)\"; done; true")
+    sm_out, _, rest = out.partition("__LS__")
+    ls_out, _, df_out = rest.partition("__DF__")
+    vols = parse_volumes(sm_out, ls_out)
+    sizes = {}
+    for line in df_out.splitlines():
+        c = line.split()   # "<path> <filesystem> <total> <used> <free> …" in 1K blocks
+        try:
+            sizes[c[0]] = {"total": int(c[2]) * 1024, "used": int(c[3]) * 1024, "free": int(c[4]) * 1024}
+        except (IndexError, ValueError):
+            pass
+    res = []
+    for uuid, kind in sorted(vols.items()):
+        path = f"/storage/{uuid}"
+        res.append({"id": uuid, "path": path, "name": kind, "storage": sizes.get(path)})
+    if len(res) > 1:  # "SD card", "SD card 2"
+        seen = {}
+        for v in res:
+            seen[v["name"]] = seen.get(v["name"], 0) + 1
+            if seen[v["name"]] > 1:
+                v["name"] += f" {seen[v['name']]}"
+    return res
+
+
+def storage_roots(serial):
+    return [HOME_DIR] + [v["path"] for v in list_volumes(serial)]
+
+
+def root_of(path, roots):
+    for r in roots:
+        if path == r or path.startswith(r + "/"):
+            return r
+    return HOME_DIR
+
+
+def trash_dir(root):
+    return root + "/.CellarTrash"
+
+
+def trash_read(serial, root=HOME_DIR):
+    out = sh(serial, f"cat {q(trash_dir(root) + '/.index')} 2>/dev/null")
     entries = []
     for line in out.splitlines():
         try:
@@ -870,90 +929,108 @@ def trash_read(serial):
     return entries
 
 
-def trash_write(serial, entries):
+def trash_write(serial, entries, root=HOME_DIR):
     fd, tmp = tempfile.mkstemp()
     with os.fdopen(fd, "w") as f:
         for e in entries:
             f.write(json.dumps(e) + "\n")
     try:
-        adb(serial, "push", tmp, TRASH_DIR + "/.index", timeout=30)
+        adb(serial, "push", tmp, trash_dir(root) + "/.index", timeout=30)
     finally:
         os.unlink(tmp)
 
 
 def phone_trash(serial, paths):
+    """Each drive keeps its own Trash, so moving to it never copies data between drives."""
     with _trash_lock:
         paths = [clean_path(p) for p in paths]
+        roots = storage_roots(serial)
         for p in paths:
-            if p == HOME_DIR or p.startswith(TRASH_DIR):
+            if p in roots or any(p.startswith(trash_dir(r)) for r in roots):
                 raise AdbError("That item can't be moved to the Trash.")
-        entries = trash_read(serial)
-        sh(serial, f"mkdir -p {q(TRASH_DIR)} && touch {q(TRASH_DIR + '/.nomedia')}")
-        moved, script = [], []
+        by_root = {}
         for p in paths:
-            tid = f"{int(time.time() * 1000)}{secrets.token_hex(2)}"
-            name = posixpath.basename(p)
-            script.append(f"mv {q(p)} {q(TRASH_DIR + '/' + tid + '__' + name)} && echo ok:{tid}")
-            moved.append({"id": tid, "name": name, "orig": p, "time": int(time.time())})
-        out = sh(serial, "; ".join(script) + "; true", timeout=300)
-        ok_ids = set(re.findall(r"ok:(\w+)", out))
-        moved = [m for m in moved if m["id"] in ok_ids]
-        trash_write(serial, entries + moved)
-        if len(moved) < len(paths):
-            failed = len(paths) - len(moved)
-            return {"items": moved, "failed": failed}
-        return {"items": moved, "failed": 0}
+            by_root.setdefault(root_of(p, roots), []).append(p)
+        all_moved = []
+        for root, group in by_root.items():
+            entries = trash_read(serial, root)
+            td = trash_dir(root)
+            sh(serial, f"mkdir -p {q(td)} && touch {q(td + '/.nomedia')}")
+            moved, script = [], []
+            for p in group:
+                tid = f"{int(time.time() * 1000)}{secrets.token_hex(2)}"
+                name = posixpath.basename(p)
+                script.append(f"mv {q(p)} {q(td + '/' + tid + '__' + name)} && echo ok:{tid}")
+                moved.append({"id": tid, "name": name, "orig": p, "time": int(time.time())})
+            out = sh(serial, "; ".join(script) + "; true", timeout=300)
+            ok_ids = set(re.findall(r"ok:(\w+)", out))
+            moved = [m for m in moved if m["id"] in ok_ids]
+            trash_write(serial, entries + moved, root)
+            all_moved += moved
+        return {"items": all_moved, "failed": len(paths) - len(all_moved)}
 
 
 def phone_untrash(serial, ids):
     with _trash_lock:
-        entries = trash_read(serial)
-        keep, restored = [], []
-        for e in entries:
-            if e["id"] not in ids:
-                keep.append(e)
+        restored = []
+        for root in storage_roots(serial):
+            entries = trash_read(serial, root)
+            if not any(e["id"] in ids for e in entries):
                 continue
-            parent = posixpath.dirname(e["orig"])
-            sh(serial, f"mkdir -p {q(parent)}")
-            name = e["name"]
-            if name in stat_names(serial, parent, [name]):
-                name = keep_both_name(name, phone_names(serial, parent))
-            target = posixpath.join(parent, name)
-            out = sh(serial, f"mv {q(TRASH_DIR + '/' + e['id'] + '__' + e['name'])} {q(target)} 2>&1; echo __rc=$?")
-            if "__rc=0" in out:
-                restored.append(target)
-            else:
-                keep.append(e)
-        trash_write(serial, keep)
+            td = trash_dir(root)
+            keep = []
+            for e in entries:
+                if e["id"] not in ids:
+                    keep.append(e)
+                    continue
+                parent = posixpath.dirname(e["orig"])
+                sh(serial, f"mkdir -p {q(parent)}")
+                name = e["name"]
+                if name in stat_names(serial, parent, [name]):
+                    name = keep_both_name(name, phone_names(serial, parent))
+                target = posixpath.join(parent, name)
+                out = sh(serial, f"mv {q(td + '/' + e['id'] + '__' + e['name'])} {q(target)} 2>&1; echo __rc=$?")
+                if "__rc=0" in out:
+                    restored.append(target)
+                else:
+                    keep.append(e)
+            trash_write(serial, keep, root)
         return {"restored": restored}
 
 
 def phone_trash_list(serial):
-    entries = {e["id"]: e for e in trash_read(serial)}
     out = []
-    try:
-        listing = list_dir(serial, TRASH_DIR)["entries"]
-    except AdbError:
-        listing = []
-    for item in listing:
-        tid, _, name = item["name"].partition("__")
-        e = entries.get(tid)
-        if not e:
+    for root in storage_roots(serial):
+        entries = {e["id"]: e for e in trash_read(serial, root)}
+        if not entries:
             continue
-        out.append({"id": tid, "name": e["name"], "orig": e["orig"], "time": e["time"], "dir": item["dir"], "size": item["size"]})
+        try:
+            listing = list_dir(serial, trash_dir(root))["entries"]
+        except AdbError:
+            listing = []
+        for item in listing:
+            tid, _, name = item["name"].partition("__")
+            e = entries.get(tid)
+            if not e:
+                continue
+            out.append({"id": tid, "name": e["name"], "orig": e["orig"], "time": e["time"], "dir": item["dir"], "size": item["size"]})
     return sorted(out, key=lambda x: -x["time"])
 
 
 def phone_trash_empty(serial, ids=None, older_than=None):
     with _trash_lock:
-        entries = trash_read(serial)
-        drop = [e for e in entries if (ids is None or e["id"] in ids) and (older_than is None or e["time"] < older_than)]
-        if not drop:
-            return {"removed": 0}
-        sh(serial, "; ".join(f"rm -rf {q(TRASH_DIR + '/' + e['id'] + '__' + e['name'])}" for e in drop) + "; true", timeout=600)
-        dropped = {e["id"] for e in drop}
-        trash_write(serial, [e for e in entries if e["id"] not in dropped])
-        return {"removed": len(drop)}
+        removed = 0
+        for root in storage_roots(serial):
+            entries = trash_read(serial, root)
+            drop = [e for e in entries if (ids is None or e["id"] in ids) and (older_than is None or e["time"] < older_than)]
+            if not drop:
+                continue
+            td = trash_dir(root)
+            sh(serial, "; ".join(f"rm -rf {q(td + '/' + e['id'] + '__' + e['name'])}" for e in drop) + "; true", timeout=600)
+            dropped = {e["id"] for e in drop}
+            trash_write(serial, [e for e in entries if e["id"] not in dropped], root)
+            removed += len(drop)
+        return {"removed": removed}
 
 
 # ---------------------------------------------------------------- search & recent
@@ -981,15 +1058,18 @@ def phone_search(serial, text, root=HOME_DIR):
         raise AdbError("Type at least 2 characters to search the whole phone.")
     pattern = "*" + re.sub(r"([\\*?\[\]])", r"\\\1", text) + "*"
     root = clean_path(root)
-    script = (f"find {q(root)} \\( -path {q(HOME_DIR + '/Android/data')} -o -path {q(HOME_DIR + '/Android/obb')} "
+    vol = root_of(root, storage_roots(serial))
+    script = (f"find {q(root)} \\( -path {q(vol + '/Android/data')} -o -path {q(vol + '/Android/obb')} "
               f"-o -name '.*' \\) -prune -o -iname {q(pattern)} -exec stat -L -c '%F|%s|%Y|%n' {{}} + 2>/dev/null | head -n 500")
     return {"entries": find_stat(serial, script, 500), "query": text}
 
 
 def phone_recent(serial, days=14):
-    script = (f"find {q(HOME_DIR)} \\( -path {q(HOME_DIR + '/Android')} -o -name '.*' \\) -prune -o "
-              f"-type f -mtime -{int(days)} -exec stat -L -c '%F|%s|%Y|%n' {{}} + 2>/dev/null")
-    entries = find_stat(serial, script, 5000)
+    entries = []
+    for root in storage_roots(serial):
+        script = (f"find {q(root)} \\( -path {q(root + '/Android')} -o -name '.*' \\) -prune -o "
+                  f"-type f -mtime -{int(days)} -exec stat -L -c '%F|%s|%Y|%n' {{}} + 2>/dev/null")
+        entries += find_stat(serial, script, 5000)
     entries.sort(key=lambda e: -e["mtime"])
     return {"entries": entries[:300]}
 
@@ -1954,6 +2034,8 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(phone_trash_empty(s, set(ids) if ids else None))
         elif R == ("GET", "/api/search"):
             self.send_json(phone_search(s, arg("q"), arg("root") or HOME_DIR))
+        elif R == ("GET", "/api/volumes"):
+            self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):
             self.send_json(phone_recent(s))
         elif R == ("GET", "/api/thumb"):
