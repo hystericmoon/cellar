@@ -171,3 +171,19 @@ try: cm.build_mirror_cmd("/x/scrcpy","S1",{"source":"camera"},info,(2,1)); ok(Fa
 except cm.AdbError as e: ok("brew upgrade scrcpy" in str(e), "old scrcpy explains how to update")
 s=cm.build_mirror_cmd("/x/scrcpy","S1",{"screen_off":True,"keyboard":"uhid"},info,(2,4)); ok("--turn-screen-off" in s and "--keyboard=uhid" in s and "--video-source=camera" not in s and "--stay-awake" in s, "screen mirroring command unchanged")
 ok(cm.android_major("15")==15 and cm.android_major("")==0 and cm.android_major("12.1")==12, "android_major")
+# --- step 7: ring, media keys, Do Not Disturb
+LOG=FB+"/calls.log"
+def calls(): return open(LOG).read() if os.path.exists(LOG) else ""
+x=call("/api/extras"); ok(x["can_ring"] and x["dnd"]=="off", f"extras {x}")
+open(LOG,"w").close()
+r=call("/api/media","POST",{"key":"playpause"}); r2=call("/api/media","POST",{"key":"next"}); ok("input keyevent 85" in calls() and "input keyevent 87" in calls(), "media keys send the right key codes")
+ok("Unknown" in call("/api/media","POST",{"key":"rm -rf"}).get("error",""), "unknown media key refused")
+r=call("/api/dnd","POST",{"mode":"priority"}); ok(r.get("dnd")=="priority" and call("/api/extras")["dnd"]=="priority", f"DND on {r}")
+r=call("/api/dnd","POST",{"mode":"off"}); ok(r.get("dnd")=="off", "DND off")
+open(FB+"/dnd_denied","w").close(); r=call("/api/dnd","POST",{"mode":"alarms"}); os.remove(FB+"/dnd_denied")
+ok("didn't change Do Not Disturb" in r.get("error","") and call("/api/extras")["dnd"]=="off", f"a phone that refuses DND is told so: {r.get('error','')[:70]}")
+ok("Unknown" in call("/api/dnd","POST",{"mode":"x"}).get("error",""), "unknown DND mode refused")
+open(LOG,"w").close(); r=call("/api/ring","POST",{})
+ok(r.get("at")=="00:00" and "SET_ALARM" in calls() and "extra.alarm.HOUR 0" in calls() and "SKIP_UI true" in calls() and "stream 4" in calls(), f"ring sets a one-time alarm for the next minute (rolls over midnight): {r}")
+open(FB+"/no_clock","w").close(); r=call("/api/ring","POST",{}); x=call("/api/extras"); os.remove(FB+"/no_clock")
+ok("no Clock app" in r.get("error","") and x["can_ring"] is False, "no Clock app: ring is unavailable and explained")

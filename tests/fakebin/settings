@@ -1,0 +1,6 @@
+#!/bin/sh
+# fake `settings get|put global zen_mode`, stored in zen.state
+D="$(dirname "$0")"
+if [ "$1 $2 $3" = "get global zen_mode" ]; then cat "$D/zen.state" 2>/dev/null || echo 0; exit 0; fi
+if [ "$1 $2 $3" = "put global zen_mode" ]; then echo "$4" > "$D/zen.state"; exit 0; fi
+echo null

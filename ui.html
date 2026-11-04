@@ -299,6 +299,8 @@ dialog.small{width:min(520px,94vw)}
 .exlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}.exlist li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius)}.exlist span{color:var(--muted);font-size:13px}.exlist .bad{border-color:var(--danger)}.exlist .bad span{color:var(--danger)}
 .smlist{list-style:none;margin:0;padding:0;max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}.smlist li{border-bottom:1px solid var(--line)}.smlist li:last-child{border:0}.smlist label{display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer}.smlist label:hover{background:var(--hover)}.smlist input{accent-color:var(--accent);width:16px;height:16px}
 .toggle input[type=radio]{accent-color:var(--accent)}
+.mediarow{display:flex;gap:8px;flex-wrap:wrap}.btn.icon.big{width:44px;height:40px}.btn.icon.big svg{width:20px;height:20px}
+.note.bad{color:var(--danger)}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
@@ -613,7 +615,7 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
@@ -1744,6 +1746,33 @@ async function renderMessages(token) {
     b.textContent = "Save"; sync(); };
 }
 PAGES.messages = renderMessages;
+
+/* ---------- Phone controls: ring, media keys, Do Not Disturb ---------- */
+const MEDIA_BTNS = [["previous","Previous","M19 20 9 12l10-8zM5 4v16"],["playpause","Play or pause","M6 4l14 8-14 8z"],["next","Next","M5 4l10 8-10 8zM19 4v16"],["voldown","Volume down","M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6"],["volup","Volume up","M11 5 6 9H3v6h3l5 4zM16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"],["mute","Mute","M11 5 6 9H3v6h3l5 4zM22 9l-6 6M16 9l6 6"]];
+const DND_OPTS = [["off","Off","Everything comes through"],["priority","Priority only","Starred contacts and alarms come through"],["alarms","Alarms only","Calls and messages are silenced"],["none","Total silence","Not even alarms (use with care)"]];
+async function renderExtras(token) {
+  let x; try { x = await api("/api/extras"); } catch(e) { $("#content").innerHTML = stateHTML("phone", "Couldn’t reach the phone", esc(e.message)); return; }
+  if (S.loadToken !== token) return;
+  $("#content").innerHTML = `<div class="page"><h1>Phone controls</h1><p class="lead">Quick controls for the connected phone. Phones differ, so anything that doesn’t work on yours is marked.</p>
+    <section class="panel" aria-labelledby="xrRing"><div class="row2"><div><h2 id="xrRing">Ring my phone</h2>
+      <p class="muted" style="margin:4px 0 0">${x.can_ring ? `Sets a one-time alarm for the next minute at full volume, even on silent. Dismiss it on the phone, then delete the “Cellar: finding your phone” alarm in the Clock app.` : `Not available on this phone: it has no Clock app Cellar can use. Try Google’s Find My Device.`}</p></div>
+      <button class="btn primary" type="button" id="xrRingGo" ${x.can_ring ? "" : "disabled"}>Ring</button></div><p class="note" id="xrRingMsg" aria-live="polite"></p></section>
+    <section class="panel" aria-labelledby="xrMedia"><h2 id="xrMedia">Music and volume</h2><div class="mediarow">
+      ${MEDIA_BTNS.map(([k, label, d]) => `<button class="btn icon big" type="button" data-media="${k}" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg></button>`).join("")}</div>
+      <p class="note">Works with the music or video app that’s playing on the phone.</p></section>
+    <section class="panel" aria-labelledby="xrDnd"><h2 id="xrDnd">Do Not Disturb</h2>${x.dnd == null ? `<p class="note">This phone didn’t report its Do Not Disturb setting, so it may not be controllable from here. You can still try.</p>` : ""}
+      <div class="dndopts" role="radiogroup" aria-labelledby="xrDnd">${DND_OPTS.map(([k, label, sub]) => `<label class="toggle"><input type="radio" name="dnd" value="${k}" ${x.dnd === k ? "checked" : ""}><span><b>${label}</b><small>${sub}</small></span></label>`).join("")}</div>
+      <p class="note" id="xrDndMsg" aria-live="polite"></p></section></div>`;
+  $("#xrRingGo").onclick = async () => { const b = $("#xrRingGo"), m = $("#xrRingMsg"); b.disabled = true;
+    try { const r = await postJSON("/api/ring", {}); m.textContent = `Alarm set for ${r.at}. If nothing rings within a minute or two, this phone doesn’t support it.`; }
+    catch(e) { m.textContent = e.message; m.className = "note bad"; } b.disabled = false; };
+  document.querySelectorAll("[data-media]").forEach(b => b.onclick = () => postJSON("/api/media", {key: b.dataset.media}).catch(e => toast(e.message, {err:true})));
+  document.querySelectorAll("[name=dnd]").forEach(r => r.onchange = async () => { const m = $("#xrDndMsg");
+    try { await postJSON("/api/dnd", {mode: r.value}); m.className = "note"; m.textContent = "Done."; }
+    catch(e) { m.className = "note bad"; m.textContent = e.message;
+      try { const now = (await api("/api/extras")).dnd; document.querySelectorAll("[name=dnd]").forEach(i => i.checked = i.value === now); } catch(_) {} } });
+}
+PAGES.extras = renderExtras;
 
 /*__NEWPAGES__*/
 

@@ -1587,6 +1587,63 @@ def sms_export(serial, fmt, keys):
     return {"folder": folder, "files": files, "count": len(msgs), "note": note}
 
 
+# ---------------------------------------------------------------- extras: ring my phone, media keys, Do Not Disturb
+
+MEDIA_KEYS = {"playpause": 85, "next": 87, "previous": 88, "stop": 86, "volup": 24, "voldown": 25, "mute": 164}
+DND_MODES = {"off": "0", "priority": "1", "none": "2", "alarms": "3"}   # `cmd notification set_dnd` word -> zen_mode value
+DND_WORD = {"off": "off", "priority": "priority", "none": "none", "alarms": "alarms"}
+RING_LABEL = "Cellar: finding your phone"
+
+
+def dnd_state(serial):
+    out = sh(serial, "settings get global zen_mode 2>/dev/null").strip()
+    return next((k for k, v in DND_MODES.items() if v == out), None)
+
+
+def extras_info(serial):
+    clock = sh(serial, "cmd package resolve-activity --brief -a android.intent.action.SET_ALARM 2>&1")
+    can_ring = bool(clock.strip()) and "No activity found" not in clock and "Exception" not in clock and "Error" not in clock
+    return {"dnd": dnd_state(serial), "can_ring": can_ring, "media_keys": list(MEDIA_KEYS)}
+
+
+def media_key(serial, key):
+    if key not in MEDIA_KEYS:
+        raise AdbError("Unknown key")
+    sh(serial, f"input keyevent {MEDIA_KEYS[key]}", check=True)
+    return {"ok": True}
+
+
+def set_dnd(serial, mode):
+    if mode not in DND_MODES:
+        raise AdbError("Unknown Do Not Disturb setting")
+    out = sh(serial, f"cmd notification set_dnd {DND_WORD[mode]} 2>&1")
+    now = dnd_state(serial)
+    if now != mode:
+        raise AdbError("This phone didn't change Do Not Disturb. Some phones only allow it from Settings › Sound › Do Not Disturb."
+                       + (" (" + adb_msg(out)[:120] + ")" if out.strip() else ""))
+    return {"dnd": now}
+
+
+def ring_phone(serial):
+    """Sets a one-time alarm for the next minute at full alarm volume. Alarms ring even when the phone is on silent."""
+    if not extras_info(serial)["can_ring"]:
+        raise AdbError("This phone has no Clock app that Cellar can use to ring it. Use Google’s Find My Device instead.")
+    hhmm = sh(serial, "date +%H:%M").strip()
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", hhmm)
+    if not m:
+        raise AdbError("Couldn't read the time on the phone.")
+    total = (int(m.group(1)) * 60 + int(m.group(2)) + 1) % 1440
+    hour, minute = divmod(total, 60)
+    sh(serial, "cmd media_session volume --stream 4 --set 15 2>/dev/null || cmd media_session volume --stream 4 --set 7 2>/dev/null; true")
+    out = sh(serial, "am start -a android.intent.action.SET_ALARM "
+                     f"--ei android.intent.extra.alarm.HOUR {hour} --ei android.intent.extra.alarm.MINUTES {minute} "
+                     f"--es android.intent.extra.alarm.MESSAGE {q(RING_LABEL)} --ez android.intent.extra.alarm.SKIP_UI true "
+                     "--ez android.intent.extra.alarm.VIBRATE true 2>&1")
+    if re.search(r"Error|Exception|not started", out):
+        raise AdbError("The phone's Clock app refused. " + adb_msg(out)[:140])
+    return {"at": f"{hour:02d}:{minute:02d}"}
+
+
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
@@ -2616,6 +2673,15 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             fmt = d.get("format") if d.get("format") in ("csv", "pdf", "both") else "csv"
             keys = set(d["threads"]) if isinstance(d.get("threads"), list) else None
             self.send_json(sms_export(s, fmt, keys))
+        elif R == ("GET", "/api/extras"):
+            self.send_json(extras_info(s))
+        elif R == ("POST", "/api/media"):
+            self.send_json(media_key(s, self.body_json().get("key")))
+        elif R == ("POST", "/api/dnd"):
+            self.send_json(set_dnd(s, self.body_json().get("mode")))
+        elif R == ("POST", "/api/ring"):
+            self.body_json()   # always drain the request body so the connection stays in sync
+            self.send_json(ring_phone(s))
         elif R == ("GET", "/api/volumes"):
             self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):
