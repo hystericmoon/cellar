@@ -134,6 +134,7 @@ ok("NOTE:Met at the fair\\; likes maths\\,\\nsecond line" in vcf and "ORG:Analyt
 import csv
 rows=list(csv.reader(open(XD+"/contacts.csv",encoding="utf-8-sig",newline=""))); ok(rows[0][0]=="Name" and rows[1][3]=="+44 20 7946 0001" and rows[2][3]=="0412 345 678; 0412 999 000" and "second line" in rows[1][6], "contacts.csv keeps multi-line notes in one cell")
 calls=list(csv.reader(open(XD+"/call-history.csv",encoding="utf-8-sig",newline=""))); ok(len(calls)==4 and calls[1][3]=="Incoming" and calls[2][3]=="Outgoing" and calls[3][3]=="Missed" and calls[1][4]=="75", f"call history csv {calls[1]}")
+ok(cm.sheet_safe("628123456789")=="6281 2345 6789" and cm.sheet_safe("085729571234")=="0857 2957 1234" and cm.sheet_safe("+6281234567890")=="+6281 2345 6789 0" and cm.sheet_safe("+62 815-1135-5600")=="+62 815-1135-5600" and cm.sheet_safe("=1+1")=="'=1+1" and cm.sheet_safe("Hello")=="Hello", "CSV: bare phone numbers stay text in spreadsheets, formula-looking cells are neutralised")
 ics=open(XD+"/calendar.ics",newline="").read()
 ok(ics.count("BEGIN:VEVENT")==3 and "Cancelled" not in ics and "SUMMARY:Dentist\\, 3rd floor" in ics and "DESCRIPTION:Bring forms\\;\\nreception opens at 9" in ics, "calendar.ics skips deleted events and escapes text")
 ok("DTSTART;VALUE=DATE:20241029" in ics and "RRULE:FREQ=WEEKLY;BYDAY=MO" in ics and "DURATION:P3600S" in ics and "DTSTART:20241028T100000Z" in ics, "all-day, repeating and timed events")

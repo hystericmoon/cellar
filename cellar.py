@@ -1284,8 +1284,24 @@ def vcard_escape(s):
     return s.replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
 
 
+_BARE_NUMBER = re.compile(r"\+?\d{6,}")
+
+
+def sheet_safe(v):
+    """Spreadsheets turn a bare 628123456789 into 6.28E+11 and drop a leading 0 (tested in GridCraft: tab, ="…" and
+    non-breaking-space tricks don't help). Grouping the digits keeps them text everywhere without changing the number.
+    Cells starting with = or @ would run as formulas, so they get a leading apostrophe."""
+    if not isinstance(v, str):
+        return v
+    if _BARE_NUMBER.fullmatch(v):
+        plus, digits = ("+" if v[0] == "+" else ""), v.lstrip("+")
+        return plus + " ".join(digits[i:i + 4] for i in range(0, len(digits), 4))
+    return "'" + v if v[:1] in ("=", "@") else v
+
+
 def csv_text(header, rows):
     import csv, io
+    rows = [[sheet_safe(c) for c in r] for r in rows]
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\r\n")
     w.writerow(header)
