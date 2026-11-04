@@ -1,0 +1,6 @@
+cellar.zip
+__pycache__/
+tests/shots/
+tests/*.out
+tests/server.log
+tests/fakebin/state.json

@@ -1,0 +1,6 @@
+#!/bin/sh
+case "$1 $2" in
+  "list packages") echo "package:/data/app/com.whatsapp-1/base.apk=com.whatsapp versionCode:241"; echo "package:/data/app/org.telegram.messenger-2/base.apk=org.telegram.messenger versionCode:5100";;
+  "path com.whatsapp") echo "package:/data/app/com.whatsapp-1/base.apk";;
+  "path org.telegram.messenger") echo "package:/data/app/org.telegram.messenger-2/base.apk"; echo "package:/data/app/org.telegram.messenger-2/split_config.arm64.apk";;
+esac

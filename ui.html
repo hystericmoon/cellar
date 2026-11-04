@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cellar</title>
+<style>
+:root{
+  --bg:#f5f6f8;--panel:#fff;--text:#15171c;--muted:#5b6270;--line:#e2e5ea;--hover:#eef0f3;
+  --accent:#2c6b5a;--accent-ink:#fff;--accent-soft:#e2efeb;--warn:#a15c07;--danger:#b42318;
+  --radius:10px;--shadow:0 1px 2px rgba(16,24,40,.05),0 12px 32px rgba(16,24,40,.12);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1114;--panel:#171a1f;--text:#e7e9ed;--muted:#9ba3af;--line:#2a2f37;--hover:#1f242b;
+  --accent:#62c2a5;--accent-ink:#0a1411;--accent-soft:#18302a;--warn:#f0b35a;--danger:#f97066;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5);
+}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.app{display:grid;grid-template-columns:264px 1fr;height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:20px 14px;overflow:auto;display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px;font-weight:650;font-size:15px;letter-spacing:-.01em}
+.brand .logo{width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0 8px;margin:0 0 6px}
+.device{border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:grid;gap:12px}
+.device h2{margin:0;font-size:15px;font-weight:620;letter-spacing:-.01em}
+.device .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.meter{display:grid;gap:5px;font-size:12.5px}
+.meter .row{display:flex;justify-content:space-between;color:var(--muted)}
+.meter .row b{color:var(--text);font-weight:560}
+.bar{height:6px;border-radius:99px;background:var(--hover);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.bar i.low{background:var(--danger)}
+select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+nav ul{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+nav button{width:100%;display:flex;align-items:center;gap:10px;padding:7px 8px;border:0;background:none;border-radius:7px;text-align:left;cursor:pointer;color:var(--text)}
+nav button:hover{background:var(--hover)}
+nav button[aria-current="true"]{background:var(--accent-soft);color:var(--accent);font-weight:560}
+nav svg{width:16px;height:16px;flex:none;opacity:.85}
+.foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 8px}
+.foot button{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+main{display:flex;flex-direction:column;min-width:0;position:relative}
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+.crumbs{display:flex;align-items:center;gap:2px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+.crumbs button{border:0;background:none;padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.crumbs button:hover{background:var(--hover);color:var(--text)}
+.crumbs button:last-child{color:var(--text);font-weight:600}
+.crumbs .sep{color:var(--muted);opacity:.6}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:560}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.icon{width:32px;padding:0;justify-content:center}
+.btn svg{width:16px;height:16px}
+.btn:disabled{opacity:.45;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);width:32px;height:30px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.seg svg{width:16px;height:16px}
+.search{position:relative}
+.search input{height:32px;width:200px;padding:0 10px 0 30px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.search svg{position:absolute;left:9px;top:8px;width:15px;height:15px;color:var(--muted)}
+#content{flex:1;overflow:auto;padding:8px 12px 40px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{position:sticky;top:-8px;background:var(--bg);text-align:left;font-weight:560;font-size:12px;color:var(--muted);padding:10px 10px 8px;border-bottom:1px solid var(--line);z-index:1}
+th button{border:0;background:none;padding:0;cursor:pointer;color:inherit;font-weight:inherit;display:inline-flex;gap:4px;align-items:center}
+th[aria-sort] button{color:var(--text)}
+td{padding:0 10px;height:40px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:var(--hover)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+td.date{color:var(--muted);font-variant-numeric:tabular-nums}
+.name{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:0;height:40px;cursor:pointer;text-align:left;min-width:0}
+.name span{overflow:hidden;text-overflow:ellipsis}
+.ico{width:28px;height:28px;flex:none;border-radius:7px;display:grid;place-items:center;background:var(--hover);color:var(--muted)}
+.ico svg{width:16px;height:16px}
+.ico.folder{background:var(--accent-soft);color:var(--accent)}
+td.act{text-align:right;overflow:visible;padding-right:6px}
+.rowact{opacity:0;transition:opacity .12s;height:28px;font-size:13px}
+tr:hover .rowact,tr:focus-within .rowact{opacity:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:12px 8px}
+.tile{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:0;cursor:pointer;overflow:hidden;text-align:left;display:flex;flex-direction:column}
+.tile:hover{border-color:var(--muted)}
+.thumb{aspect-ratio:1;background:var(--hover);display:grid;place-items:center;color:var(--muted);overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb svg{width:34px;height:34px}
+.thumb.folder{background:var(--accent-soft);color:var(--accent)}
+.tile .cap{padding:8px 10px;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile .cap small{display:block;color:var(--muted);font-size:11.5px}
+.state{max-width:520px;margin:9vh auto;text-align:center;padding:0 20px}
+.state .big{width:56px;height:56px;border-radius:16px;margin:0 auto 18px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.state .big svg{width:26px;height:26px}
+.state h1{font-size:20px;letter-spacing:-.015em;margin:0 0 6px}
+.state p{color:var(--muted);margin:0 0 18px}
+.steps{text-align:left;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:6px 18px;margin:0;counter-reset:s;list-style:none}
+.steps li{counter-increment:s;padding:12px 0 12px 34px;position:relative;border-bottom:1px solid var(--line)}
+.steps li:last-child{border:0}
+.steps li::before{content:counter(s);position:absolute;left:0;top:11px;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:650;display:grid;place-items:center}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--hover);padding:2px 6px;border-radius:5px}
+.spinner{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:12vh auto}
+@keyframes spin{to{transform:rotate(1turn)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}}
+#content[aria-busy="true"]{pointer-events:none}
+#content[aria-busy="true"] table,#content[aria-busy="true"] .grid{opacity:.55;transition:opacity .15s .1s}
+th.ck,td.ck{padding:0 0 0 10px}
+input.sel{width:16px;height:16px;margin:0;accent-color:var(--accent);cursor:pointer;vertical-align:middle}
+td.ck input.sel{opacity:.35;transition:opacity .12s}
+tr:hover td.ck input.sel,main.selecting td.ck input.sel,td.ck input.sel:focus-visible,td.ck input.sel:checked{opacity:1}
+tr.selected td{background:var(--accent-soft)}
+tr.selected:hover td{background:color-mix(in srgb,var(--accent-soft) 80%,var(--accent) 8%)}
+.tilewrap{position:relative;display:flex}
+.tilewrap .tile{flex:1}
+.tilewrap input.sel{position:absolute;top:8px;left:8px;width:20px;height:20px;opacity:0;transition:opacity .12s;box-shadow:0 0 0 2px rgba(255,255,255,.85);border-radius:4px}
+.tilewrap:hover input.sel,main.selecting .tilewrap input.sel,.tilewrap input.sel:focus-visible,.tilewrap input.sel:checked{opacity:1}
+.tilewrap.selected .tile{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.tilewrap.selected .thumb img{opacity:.85}
+.selbar{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);z-index:6;white-space:nowrap}
+.selbar[hidden]{display:none}
+#selText{font-weight:560;margin-right:6px;font-variant-numeric:tabular-nums}
+main.selecting #content{padding-bottom:90px}
+.drop{position:absolute;inset:60px 16px 16px;border:2px dashed var(--accent);border-radius:14px;background:color-mix(in srgb,var(--accent-soft) 85%,transparent);display:none;place-items:center;font-weight:600;color:var(--accent);font-size:16px;pointer-events:none;z-index:5}
+.drop.on{display:grid}
+body.selecting #toasts{bottom:84px}
+#toasts{position:fixed;right:18px;bottom:18px;transition:bottom .15s;display:grid;gap:8px;z-index:50}
+.toast{background:var(--text);color:var(--bg);padding:10px 14px;border-radius:9px;box-shadow:var(--shadow);max-width:380px;display:flex;gap:12px;align-items:center}
+.toast.err{background:var(--danger);color:#fff}
+.toast button{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;padding:0;font-weight:600}
+dialog{border:0;padding:0;border-radius:14px;background:var(--panel);color:var(--text);box-shadow:var(--shadow);width:min(1100px,94vw);max-height:92vh}
+dialog::backdrop{background:rgba(10,12,16,.6)}
+.dhead{display:flex;align-items:center;gap:8px;padding:12px 14px 12px 18px;border-bottom:1px solid var(--line)}
+.dhead h2{font-size:14px;font-weight:600;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dhead small{color:var(--muted);font-weight:400;margin-left:8px}
+.dbody{display:grid;place-items:center;background:var(--bg);min-height:300px;max-height:calc(92vh - 58px);overflow:auto}
+.dbody img,.dbody video{max-width:100%;max-height:calc(92vh - 58px);display:block}
+.dbody pre{margin:0;padding:18px;width:100%;align-self:start;white-space:pre-wrap;word-break:break-word;font:12.5px/1.55 ui-monospace,Menlo,monospace}
+.dbody iframe{width:100%;height:calc(92vh - 58px);border:0;background:#fff}
+.dbody audio{margin:60px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.btn.full{width:100%;justify-content:center}
+.btn.quiet{border-color:transparent;color:var(--muted);height:28px;font-size:12.5px}
+.btn.quiet:hover{color:var(--text)}
+.tiny{margin:-6px 2px 0;font-size:12px;color:var(--muted)}
+.conn{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);padding:7px 9px;border-radius:8px;background:var(--hover)}
+.conn.on{background:var(--accent-soft);color:var(--accent)}
+.conn svg{width:15px;height:15px;flex:none}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;margin:18px 0 14px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+#wifi{width:min(640px,94vw)}
+.wbody{padding:18px 20px 22px;display:grid;gap:16px}
+.wbody .hint{margin:0;color:var(--muted)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:var(--hover);border-radius:10px}
+.tabs button{border:0;background:none;padding:8px 6px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:540;line-height:1.25}
+.tabs button small{display:block;font-weight:400;font-size:11.5px}
+.tabs button[aria-selected="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(16,24,40,.12)}
+.qrwrap{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:center}
+.qr{width:200px;height:200px;border-radius:12px;background:#fff;display:grid;place-items:center;padding:10px;border:1px solid var(--line)}
+.qr svg{width:100%;height:100%}
+.qr .ph{color:#5b6270;font-size:12.5px;text-align:center;padding:10px}
+.steps.compact li{padding:9px 0 9px 32px;font-size:13.5px}
+.steps.compact li::before{top:8px}
+.wstatus{margin:0;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;background:var(--hover);color:var(--muted);min-height:42px}
+.wstatus.ok{background:var(--accent-soft);color:var(--accent);font-weight:560}
+.wstatus.err{color:var(--danger)}
+.wstatus .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.wstatus.busy .dot{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.wstatus.busy .dot{animation:none}}
+.wform{display:grid;grid-template-columns:1fr 150px auto;gap:10px;align-items:end}
+.wform.two{grid-template-columns:1fr auto}
+.field{display:grid;gap:5px;font-size:12.5px;font-weight:560;min-width:0}
+.field input{width:100%;min-width:0;height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-weight:400;font-size:14px;font-variant-numeric:tabular-nums}
+.wform .btn{height:36px}
+.known{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px}
+.known li{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.known li:last-child{border:0}
+.known li span{flex:1}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+@media (max-width:600px){.qrwrap{grid-template-columns:1fr}.qr{margin:auto}.wform{grid-template-columns:1fr}}
+@media (max-width:820px){.app{grid-template-columns:1fr}aside{display:none}.search input{width:130px}}
+
+/* ---------- v3 components ---------- */
+.muted{color:var(--muted)}
+.hint{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:13px;background:var(--accent-soft);color:var(--accent);border-bottom:1px solid var(--line)}
+.hint b{font-weight:600}
+.hint svg{width:16px;height:16px;flex:none}
+.hint .grow{flex:1}
+.hint button{background:none;border:0;color:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px;padding:0}
+kbd{font:500 11.5px/1 ui-monospace,Menlo,monospace;padding:2px 5px;border:1px solid currentColor;border-radius:4px;opacity:.85}
+tr.cut td .name,.tilewrap.cut .tile{opacity:.45}
+tr.cut td .name span:last-child{font-style:italic}
+.droptarget td,.droptarget .tile,nav button.droptarget,.crumbs button.droptarget{background:var(--accent-soft)!important;box-shadow:inset 0 0 0 2px var(--accent);border-radius:6px}
+td.where{color:var(--muted);font-size:12.5px}
+.rowmore{width:28px;height:28px;padding:0;justify-content:center;font-size:16px;line-height:1;opacity:0}
+tr:hover .rowmore,tr:focus-within .rowmore,.rowmore[aria-expanded="true"]{opacity:1}
+td.act{display:flex;gap:4px;justify-content:flex-end;align-items:center;height:40px}
+input.rename{flex:1;min-width:0;height:26px;border:2px solid var(--accent);border-radius:6px;padding:0 6px;background:var(--panel);font:inherit}
+.dayhead{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;padding:14px 2px 2px;font-weight:620;font-size:14px}
+.dayhead span{color:var(--muted);font-weight:400;font-size:12.5px}
+.grid .dayhead:first-child{padding-top:2px}
+#ctxmenu{position:fixed;z-index:60;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:5px}
+#ctxmenu button{display:flex;width:100%;align-items:center;gap:16px;justify-content:space-between;border:0;background:none;padding:7px 10px;border-radius:6px;cursor:pointer;text-align:left;font-size:13.5px}
+#ctxmenu button:hover,#ctxmenu button:focus{background:var(--accent);color:var(--accent-ink);outline:none}
+#ctxmenu button:hover span,#ctxmenu button:focus span{color:inherit}
+#ctxmenu button span{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+#ctxmenu button:disabled{opacity:.4;cursor:default;background:none;color:inherit}
+#ctxmenu button.danger{color:var(--danger)}
+#ctxmenu button.danger:hover,#ctxmenu button.danger:focus{background:var(--danger);color:#fff}
+#ctxmenu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+#dock{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:min(400px,calc(100vw - 36px))}
+body.selecting #dock{bottom:84px}
+#dock #toasts{position:static;display:grid;gap:8px;justify-items:end}
+#transfers{width:380px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.tx-head{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:none;padding:11px 14px;font-weight:600;cursor:pointer}
+.tx-head .tx-caret{transition:transform .15s;color:var(--muted)}
+.tx-head[aria-expanded="false"] .tx-caret{transform:rotate(-90deg)}
+#txList{list-style:none;margin:0;padding:0;max-height:320px;overflow:auto;border-top:1px solid var(--line)}
+#txList li{padding:10px 14px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+#txList .r1{display:flex;gap:8px;align-items:center;justify-content:space-between;min-width:0}
+#txList .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;min-width:0}
+#txList .st{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+#txList .st.ok{color:var(--accent);font-weight:600}
+#txList .st.err{color:var(--danger);font-weight:600}
+#txList .r2{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#txList .r2 button{background:none;border:0;padding:0;color:var(--accent);font-weight:600;cursor:pointer;font-size:12px}
+#txList .x{width:24px;height:24px;border-radius:6px;border:0;background:none;cursor:pointer;color:var(--muted);flex:none}
+#txList .x:hover{background:var(--hover);color:var(--text)}
+#txList details{font-size:12px;color:var(--danger)}
+#txList details ul{margin:4px 0 0;padding-left:16px;color:var(--muted)}
+.tx-foot{display:flex;justify-content:flex-end;padding:4px 8px}
+#transfers.collapsed #txList,#transfers.collapsed .tx-foot{display:none}
+dialog.small{width:min(520px,94vw)}
+.cbody{padding:20px 22px;display:grid;gap:14px}
+.cbody h2{margin:0;font-size:16px;letter-spacing:-.01em}
+.cbody p{margin:0}
+.cbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cbtns .grow{flex:1}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.cfcompare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cfcompare div{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;display:grid;gap:2px}
+.cfcompare b{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.cfcompare .newer{border-color:var(--accent)}
+.check{display:flex;gap:8px;align-items:center;font-size:13.5px}
+.check input,.toggle input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.toggle{display:flex;gap:12px;align-items:flex-start;padding:4px 0;cursor:pointer}
+.toggle input{margin-top:2px;flex:none}
+.toggle span{display:grid;gap:2px}
+.toggle b{font-weight:560}
+.toggle small{color:var(--muted);font-size:12.5px}
+.page{max-width:880px;margin:0 auto;padding:22px 16px 60px;display:grid;gap:18px}
+.page h1{font-size:22px;letter-spacing:-.02em;margin:0}
+.page .lead{color:var(--muted);margin:-10px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:14px}
+.panel h2{margin:0;font-size:15px}
+.bignum{font-size:28px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bignum small{font-size:14px;color:var(--muted);font-weight:400;margin-left:6px}
+.row2{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.srcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.srcs label{display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13.5px;cursor:pointer}
+.srcs label small{display:block;color:var(--muted);font-size:12px}
+.srcs label.off{opacity:.5;cursor:default}
+.srcs input{accent-color:var(--accent);margin:2px 0 0}
+.pathbox{display:flex;gap:8px;align-items:center}
+.pathbox code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:8px 10px;border-radius:8px}
+.addmenu-anchor{position:relative}
+@media (max-width:820px){#transfers{width:100%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside aria-label="Device and places">
+    <div class="brand"><span class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span>Cellar</div>
+    <section id="deviceBox" aria-live="polite"></section>
+    <nav aria-label="Places"><p class="label">Places</p><ul id="places"></ul></nav>
+    <nav aria-label="Library"><p class="label">Library</p><ul id="library"></ul></nav>
+    <div class="foot">Saved files go to<br><button id="revealBtn" type="button">~/Downloads/Cellar</button>
+      <button class="btn full quiet" id="settingsBtn" type="button" style="margin-top:10px;justify-content:flex-start;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button></div>
+  </aside>
+  <main>
+    <div class="toolbar">
+      <button class="btn icon" id="upBtn" type="button" aria-label="Up one folder" title="Up one folder (⌘↑)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      <div class="crumbs" id="crumbs" role="navigation" aria-label="Current folder"></div>
+      <label class="search"><span class="sr">Filter this folder</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="filter" type="search" placeholder="Filter  ( / )" autocomplete="off"></label>
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" data-view="list" aria-label="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+        <button type="button" data-view="grid" aria-label="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
+      </div>
+      <button class="btn icon" id="newFolderBtn" type="button" aria-label="New folder" title="New folder (⌥⌘N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/></svg></button>
+      <button class="btn icon" id="shotBtn" type="button" aria-label="Take a screenshot of the phone" title="Screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="btn icon" id="mirrorBtn" type="button" aria-label="Mirror the phone screen on your Mac" title="Mirror screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="14" height="10" rx="2"/><rect x="17" y="8" width="5" height="12" rx="1.5"/><path d="M6 18h6"/></svg></button>
+      <button class="btn primary" id="addBtn" type="button" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>Add<span aria-hidden="true" style="margin-left:2px;opacity:.8">▾</span></button>
+      <input type="file" id="fileInput" multiple hidden>
+      <input type="file" id="folderInput" webkitdirectory multiple hidden>
+    </div>
+    <div class="hint" id="hint" hidden></div>
+    <div id="content" tabindex="-1"></div>
+    <div class="selbar" id="selbar" role="region" aria-label="Selection" hidden>
+      <span id="selText" aria-live="polite"></span>
+      <button class="btn quiet" type="button" id="selAll">Select all</button>
+      <button class="btn" type="button" id="selTrash" aria-label="Move selected items to Trash" title="Move to Trash (⌘⌫)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+      <button class="btn primary" type="button" id="selSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>Save to Mac</button>
+      <button class="btn icon quiet" type="button" id="selClear" aria-label="Clear selection" title="Clear (Esc)">✕</button>
+    </div>
+    <div class="drop" id="drop" aria-hidden="true">Drop files or folders to copy them here</div>
+  </main>
+</div>
+<div id="dock">
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <section id="transfers" aria-label="Transfers" hidden>
+    <button type="button" class="tx-head" id="txHead" aria-expanded="true"><span id="txTitle">Transfers</span><span class="tx-caret" aria-hidden="true">▾</span></button>
+    <ul id="txList"></ul>
+    <div class="tx-foot"><button type="button" class="btn quiet" id="txClear">Clear finished</button></div>
+  </section>
+</div>
+<div id="announce" class="sr" aria-live="polite"></div>
+<div id="ctxmenu" role="menu" hidden></div>
+<dialog id="conflict" aria-labelledby="cfTitle" class="small">
+  <div class="cbody">
+    <h2 id="cfTitle"></h2>
+    <p id="cfDetail" class="muted"></p>
+    <div class="cfcompare" id="cfCompare"></div>
+    <label class="check" id="cfAllWrap"><input type="checkbox" id="cfAll"> <span id="cfAllText">Do this for all conflicts</span></label>
+    <div class="cbtns">
+      <button type="button" class="btn quiet" data-cf="stop">Stop</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" data-cf="skip">Skip</button>
+      <button type="button" class="btn" data-cf="new">Keep both</button>
+      <button type="button" class="btn primary" data-cf="replace" id="cfReplace">Replace</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="confirm" aria-labelledby="cnTitle" class="small">
+  <div class="cbody">
+    <h2 id="cnTitle"></h2>
+    <p id="cnBody" class="muted"></p>
+    <div class="cbtns"><span class="grow"></span><button type="button" class="btn" id="cnCancel">Cancel</button><button type="button" class="btn primary" id="cnOk">OK</button></div>
+  </div>
+</dialog>
+<dialog id="mirror" aria-labelledby="mrTitle" class="small">
+  <div class="dhead"><h2 id="mrTitle">Mirror the phone screen</h2><button class="btn icon" type="button" id="mrClose" aria-label="Close">✕</button></div>
+  <div class="cbody" id="mrBody"></div>
+</dialog>
+<dialog id="settings" aria-labelledby="stTitle" class="small">
+  <div class="dhead"><h2 id="stTitle">Settings</h2><button class="btn icon" type="button" id="stClose" aria-label="Close">✕</button></div>
+  <div class="cbody">
+    <label class="toggle"><input type="checkbox" id="stFinder"><span><b>Show the phone in Finder when it connects</b><small>It appears under Locations, so Finder's own copy, paste and drag work.</small></span></label>
+    <label class="toggle"><input type="checkbox" id="stNotify"><span><b>Notifications</b><small>Tell me when long transfers and backups finish.</small></span></label>
+    <p class="muted" style="font-size:12.5px">Shortcuts: ⌘C copy · ⌘X cut · ⌘V paste · ⌥⌘V move here · ⌘⌫ Trash · ⌘Z undo · F2 rename · ⌘D duplicate · ⌥⌘N new folder · Space preview · ⌘F search</p>
+  </div>
+</dialog>
+<dialog id="wifi" aria-labelledby="wTitle">
+  <div class="dhead"><h2 id="wTitle">Connect over Wi-Fi</h2><button class="btn icon" type="button" id="wClose" aria-label="Close">✕</button></div>
+  <div class="wbody">
+    <p class="hint">Your phone and Mac need to be on the same Wi-Fi network. You only pair once; after that Cellar reconnects by itself.</p>
+    <div class="tabs" role="tablist" aria-label="Connection method">
+      <button role="tab" type="button" id="tab-qr" aria-controls="p-qr" data-tab="qr">Scan QR code<small>Android 11+</small></button>
+      <button role="tab" type="button" id="tab-code" aria-controls="p-code" data-tab="code">Pairing code<small>Android 11+</small></button>
+      <button role="tab" type="button" id="tab-ip" aria-controls="p-ip" data-tab="ip">IP address<small>Set up before</small></button>
+    </div>
+    <section role="tabpanel" id="p-qr" aria-labelledby="tab-qr" data-panel="qr">
+      <div class="qrwrap">
+        <div class="qr" id="qrBox" role="img" aria-label="Pairing QR code"><div class="ph">Making a code…</div></div>
+        <ol class="steps compact">
+          <li>On the phone, open <b>Settings › Developer options</b>.</li>
+          <li>Turn on <b>Wireless debugging</b>, then tap it to open it.</li>
+          <li>Tap <b>Pair device with QR code</b> and scan this code.</li>
+        </ol>
+      </div>
+    </section>
+    <section role="tabpanel" id="p-code" aria-labelledby="tab-code" data-panel="code" hidden>
+      <ol class="steps compact">
+        <li>On the phone, open <b>Settings › Developer options › Wireless debugging</b> and turn it on.</li>
+        <li>Tap <b>Pair device with pairing code</b>. Enter the 6-digit code and the <b>IP address &amp; port</b> shown in that popup.</li>
+      </ol>
+      <form class="wform" id="pairForm" style="margin-top:14px">
+        <label class="field">IP address &amp; port<input id="pairAddr" placeholder="192.168.1.20:37215" inputmode="decimal" autocomplete="off" required></label>
+        <label class="field">Pairing code<input id="pairCode" placeholder="123456" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required></label>
+        <button class="btn primary" type="submit">Pair</button>
+      </form>
+    </section>
+    <section role="tabpanel" id="p-ip" aria-labelledby="tab-ip" data-panel="ip" hidden>
+      <p class="note" style="margin-bottom:12px">Use this for a phone you've paired before, or one you switched to wireless with the cable. On Android 10 and older: plug in once and use <b>Go wireless</b> in the sidebar.</p>
+      <form class="wform two" id="ipForm">
+        <label class="field">IP address &amp; port<input id="ipAddr" placeholder="192.168.1.20:5555" inputmode="decimal" autocomplete="off" required></label>
+        <button class="btn primary" type="submit">Connect</button>
+      </form>
+      <div id="knownBox" style="margin-top:14px"></div>
+    </section>
+    <p class="wstatus" id="wStatus" role="status" aria-live="polite" hidden><span class="dot" aria-hidden="true"></span><span id="wStatusText"></span></p>
+  </div>
+</dialog>
+<dialog id="viewer" aria-labelledby="vTitle">
+  <div class="dhead">
+    <h2 id="vTitle"></h2>
+    <button class="btn icon" id="vPrev" type="button" aria-label="Previous file">‹</button>
+    <button class="btn icon" id="vNext" type="button" aria-label="Next file">›</button>
+    <button class="btn" id="vSave" type="button">Save to Mac</button>
+    <button class="btn icon" id="vClose" type="button" aria-label="Close">✕</button>
+  </div>
+  <div class="dbody" id="vBody"></div>
+</dialog>
+<script>
+const T = "__TOKEN__", HOME = "__HOME__";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k){ try { return localStorage.getItem("dv-"+k) } catch(e){ return null } },
+                set(k,v){ try { localStorage.setItem("dv-"+k, v) } catch(e){} } };
+
+const I = {
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  image:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+  video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="m16 10 6-3v10l-6-3"/>',
+  audio:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  text:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  pdf:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  archive:'<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
+  apk:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  home:'<path d="m3 11 9-8 9 8M5 10v10h14V10"/>', camera:'<path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+  download:'<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>', phone:'<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+  plug:'<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>', lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>', empty:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 13h6"/>'
+};
+const svg = (k, sw=1.8) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]||I.file}</svg>`;
+
+const EXT = { image:"jpg jpeg png gif webp heic heif bmp avif", video:"mp4 mov webm mkv 3gp m4v",
+  audio:"mp3 m4a aac wav ogg opus flac amr", text:"txt md json csv log xml htm html js css ini conf yml yaml srt vcf",
+  pdf:"pdf", archive:"zip rar 7z tar gz", apk:"apk" };
+const kind = e => { if (e.dir) return "folder"; const x = e.name.includes(".") ? e.name.split(".").pop().toLowerCase() : "";
+  for (const k in EXT) if (EXT[k].split(" ").includes(x)) return k; return "file"; };
+const previewable = e => ["image","video","audio","text","pdf"].includes(kind(e));
+
+const PLACE_DEFS = [["Internal storage",[""],"home"],["Camera",["DCIM/Camera"],"camera"],["Screenshots",["Pictures/Screenshots","DCIM/Screenshots"],"image"],
+  ["Pictures",["Pictures"],"image"],["Downloads",["Download"],"download"],["Documents",["Documents"],"text"],
+  ["Music",["Music"],"audio"],["Movies",["Movies"],"video"],["WhatsApp media",["Android/media/com.whatsapp/WhatsApp/Media","WhatsApp/Media"],"folder"]];
+let PLACES = PLACE_DEFS.map(([l, rels, ic]) => [l, rels[0], ic]);
+async function resolvePlaces() {
+  const all = PLACE_DEFS.flatMap(d => d[1].filter(Boolean).map(r => HOME + "/" + r));
+  let have; try { have = new Set((await api("/api/exists", {paths: all.join("\n")})).exist); } catch(e) { return; }
+  PLACES = PLACE_DEFS.map(([l, rels, ic]) => { if (!rels[0]) return [l, "", ic]; const r = rels.find(x => have.has(HOME + "/" + x)); return r ? [l, r, ic] : null; }).filter(Boolean);
+  renderPlaces();
+}
+
+const S = { serial:null, ready:false, adb:true, devices:[], path:HOME, listPath:HOME, entries:[], loading:false, mode:"folder", clip:null,
+  sort:{ key:store.get("sk")||"name", dir:+(store.get("sd")||1) }, filter:"", view:store.get("view")||"list" };
+
+async function serverAlive() { try { await fetch("/api/devices", {headers:{"X-Token":T}}); return true; } catch(e) { return false; } }
+async function api(path, params={}, opts={}) {
+  const qs = new URLSearchParams(Object.assign(S.serial ? {s:S.serial} : {}, params)).toString();
+  let r;
+  try { r = await fetch(path + (qs ? "?"+qs : ""), Object.assign({}, opts, { headers: Object.assign({"X-Token":T}, opts.headers||{}) })); }
+  catch(e) { throw new Error(await serverAlive() ? (opts.body ? "Couldn't read it on your Mac. If it's in iCloud, download it first." : "Connection hiccup. Try again.")
+                                                : "Cellar has stopped. Start it again from Terminal or the launcher."); }
+  let j; try { j = await r.json(); } catch(e) { j = { error: r.statusText }; }
+  if (!r.ok || j.error) throw new Error(j.error || r.statusText);
+  return j;
+}
+const fileUrl = (path, dl) => "/api/file?" + new URLSearchParams(Object.assign({s:S.serial, path, t:T}, dl ? {dl:1} : {}));
+const join = (a,b) => (a === "/" ? "" : a) + "/" + b;
+const fmtSize = n => { if (n < 1024) return n + " B"; const u = ["KB","MB","GB","TB"]; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 3); return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + " " + u[i]; };
+const fmtDate = s => { const d = new Date(s*1000), now = new Date();
+  return d.toLocaleDateString(undefined, d.getFullYear() === now.getFullYear() ? {month:"short",day:"numeric"} : {year:"numeric",month:"short",day:"numeric"})
+    + ", " + d.toLocaleTimeString(undefined, {hour:"numeric",minute:"2-digit"}); };
+
+function toast(msg, opts={}) {
+  const el = document.createElement("div"); el.className = "toast" + (opts.err ? " err" : "");
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  if (opts.action) { const b = document.createElement("button"); b.type = "button"; b.textContent = opts.action[0]; b.onclick = opts.action[1]; el.appendChild(b); }
+  $("#toasts").appendChild(el);
+  while ($("#toasts").children.length > 3) $("#toasts").firstElementChild.remove();
+  let left = opts.ms || (opts.err ? 7000 : 4500), t0 = Date.now(), timer = setTimeout(() => el.remove(), left);
+  const pause = () => { clearTimeout(timer); left -= Date.now() - t0; }, resume = () => { t0 = Date.now(); timer = setTimeout(() => el.remove(), Math.max(left, 2500)); };
+  el.addEventListener("mouseenter", pause); el.addEventListener("mouseleave", resume); el.addEventListener("focusin", pause); el.addEventListener("focusout", resume);
+  return el;
+}
+
+/* ---------- device status ---------- */
+let devSig = "";
+async function refreshDevices() {
+  try {
+    const d = await api("/api/devices");
+    S.adb = d.adb; S.devices = d.devices;
+    const usable = d.devices.filter(x => x.state === "device");
+    if (!usable.find(x => x.serial === S.serial)) {
+      const prev = S.serial, next = usable[0] ? usable[0].serial : null;
+      if (next !== S.serial) { S.serial = next; S.ready = !!next; S.info = null;
+        if (next) { loadInfo(); routeFromHash(true);
+          if (prev && usable[0].transport === "wifi") toast("Cable unplugged. Still connected over Wi-Fi."); } }
+    }
+    const sig = JSON.stringify([S.serial, usable.map(x => [x.serial, x.transport, x.wifi_ready])]);
+    if (!usable.length) { S.ready = false; if (sig !== devSig) { renderDevice(null); renderState(); } }
+    else if (sig !== devSig) renderDevice(S.info);
+    devSig = sig;
+  } catch(e) { /* server gone */ }
+}
+function pollDevices() { refreshDevices().finally(() => setTimeout(pollDevices, 3000)); }
+async function loadInfo() { resolvePlaces(); try { S.info = await api("/api/info"); } catch(e) { S.info = null; } renderDevice(S.info); }
+
+const WIFI_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></svg>';
+const USB_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v15M8 7l4-4 4 4M7 11v2l5 3M17 9v3l-5 3"/><circle cx="12" cy="20" r="1.5"/></svg>';
+function renderDevice(info) {
+  const box = $("#deviceBox"); const usable = S.devices.filter(x => x.state === "device");
+  const cur = usable.find(x => x.serial === S.serial);
+  if (!S.serial || !cur) { box.innerHTML = `<p class="label">Device</p><div class="device"><div><h2>No phone</h2><div class="sub">Waiting for a connection…</div></div>
+    <button class="btn full" type="button" data-wifi="qr">${WIFI_SVG}Connect over Wi-Fi</button></div>`; return; }
+  const name = info ? `${info.manufacturer} ${info.model}`.trim() : cur.model || S.serial;
+  const wifi = cur.transport === "wifi";
+  let html = `<p class="label">Device</p><div class="device"><div><h2>${esc(name)}</h2><div class="sub">${info && info.android ? "Android " + esc(info.android) : "&nbsp;"}</div></div>
+    <div class="conn ${wifi || cur.wifi_ready ? "on" : ""}">${wifi ? WIFI_SVG : USB_SVG}<span>${wifi ? "Connected over Wi-Fi" : cur.wifi_ready ? "USB, with Wi-Fi ready. Safe to unplug." : "Connected by cable"}</span></div>`;
+  if (info && info.battery != null) html += `<div class="meter"><div class="row"><span>Battery</span><b>${info.battery}%</b></div><div class="bar" role="img" aria-label="Battery ${info.battery} percent"><i class="${info.battery <= 15 ? "low" : ""}" style="width:${info.battery}%"></i></div></div>`;
+  if (info && info.storage) { const st = info.storage, pct = Math.round(st.used / st.total * 100);
+    html += `<div class="meter"><div class="row"><span>Storage</span><b>${fmtSize(st.free)} free</b></div><div class="bar" role="img" aria-label="Storage ${pct} percent used"><i style="width:${pct}%"></i></div><div class="row"><span>${fmtSize(st.used)} of ${fmtSize(st.total)}</span></div></div>`; }
+  if (usable.length > 1) html += `<label><span class="sr">Choose device</span><select id="devSel">${usable.map(d => `<option value="${esc(d.serial)}" ${d.serial===S.serial?"selected":""}>${esc(d.model || d.serial)} (${d.transport === "wifi" ? "Wi-Fi" : "USB"})</option>`).join("")}</select></label>`;
+  html += `<button class="btn full" type="button" id="finderBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M12 4v14M8 9v1M16 9v1M8.5 14c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2"/></svg>Show in Finder</button>`;
+  if (!wifi && !cur.wifi_ready) html += `<button class="btn full" type="button" id="goWifi">${WIFI_SVG}Go wireless</button><p class="tiny">Turns on Wi-Fi access so you can unplug the cable. Stays on until the phone restarts.</p>`;
+  if (wifi || cur.wifi_ready) html += `<button class="btn full quiet" type="button" id="wifiOff">Turn off Wi-Fi connection</button>`;
+  box.innerHTML = html + "</div>";
+  const sel = $("#devSel"); if (sel) sel.onchange = () => { S.serial = sel.value; S.info = null; loadInfo(); go(HOME); };
+  const gw = $("#goWifi"); if (gw) gw.onclick = goWireless;
+  $("#finderBtn").onclick = showInFinder;
+  const off = $("#wifiOff"); if (off) off.onclick = async () => {
+    try { await api("/api/wifi/disconnect", {s: wifi ? cur.serial : cur.wifi_serial}, {method:"POST"}); toast("Wi-Fi connection turned off"); refreshDevices(); }
+    catch(e) { toast(e.message, {err:true}); } };
+}
+async function goWireless() {
+  const b = $("#goWifi"); b.disabled = true; b.lastChild.textContent = "Turning on…";
+  try { const r = await api("/api/wifi/enable", {}, {method:"POST"});
+    toast(`Wireless is on at ${r.address}. You can unplug the cable whenever you like.`, {ms:8000}); await refreshDevices(); }
+  catch(e) { toast(e.message, {err:true}); b.disabled = false; b.lastChild.textContent = "Go wireless"; }
+}
+document.addEventListener("click", e => { const w = e.target.closest("[data-wifi]"); if (w) openWifi(w.dataset.wifi); });
+
+function renderPlaces() {
+  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => { const p = rel ? HOME + "/" + rel : HOME;
+    return `<li><button type="button" data-path="${esc(p)}" aria-current="${S.path === p}">${svg(ic)}<span>${esc(label)}</span></button></li>`; }).join("");
+}
+$("#places").onclick = e => { const b = e.target.closest("button[data-path]"); if (b) go(b.dataset.path); };
+
+function renderState() {
+  const c = $("#content");
+  if (!S.adb) { c.innerHTML = `<div class="state"><div class="big">${svg("wrench")}</div><h1>One-time setup: Android tools</h1>
+    <p>Cellar talks to your phone through Google's free Android platform tools (about 12 MB).</p>
+    <button class="btn primary" type="button" id="adbGet">Download Android tools</button>
+    <p class="muted" style="margin-top:14px;font-size:13px">Prefer Homebrew? Run <code>brew install --cask android-platform-tools</code>, then reload this page.</p></div>`;
+    $("#adbGet").onclick = async () => { const b = $("#adbGet"); b.disabled = true; b.textContent = "Downloading…";
+      try { await api("/api/tools/install", {tool:"adb"}, {method:"POST"}); toast("Android tools installed"); devSig = ""; refreshDevices(); }
+      catch(e) { b.disabled = false; b.textContent = "Try again"; toast(e.message, {err:true}); } };
+    return; }
+  if (S.devices.some(d => d.state === "unauthorized")) { c.innerHTML = `<div class="state"><div class="big">${svg("lock")}</div><h1>Allow access on your phone</h1>
+    <p>Unlock your phone. A prompt asks <b>“Allow USB debugging?”</b>. Tick <b>Always allow from this computer</b>, then tap <b>Allow</b>.</p>
+    <p>No prompt? Unplug and plug the cable back in.</p></div>`; return; }
+  c.innerHTML = `<div class="state"><div class="big">${svg("plug")}</div><h1>Connect your Android phone</h1>
+    <p>You only need to do this once per phone.</p>
+    <ol class="steps"><li>On the phone, open <b>Settings › About phone</b> and tap <b>Build number</b> 7 times to turn on Developer options.</li>
+    <li>Go to <b>Settings › System › Developer options</b> and turn on <b>USB debugging</b>. On Samsung, Developer options is at the bottom of Settings.</li>
+    <li>Plug the phone into your Mac with a USB data cable. Some cheap cables only charge.</li>
+    <li>Tap <b>Allow</b> on the phone when it asks. This page updates by itself.</li></ol>
+    <div class="or"><span>or</span></div>
+    <button class="btn" type="button" data-wifi="qr">${WIFI_SVG}Connect over Wi-Fi, no cable needed</button></div>`;
+}
+
+/* ---------- navigation: folders and library views ---------- */
+// Hash: "#/storage/emulated/0/DCIM" for folders, "#:recent", "#:trash", "#:backup", "#:apps", "#:search:<query>"
+const ep = e => e.path || join(S.listPath, e.name);
+const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
+const baseName = p => p.split("/").pop();
+const placeLabel = p => p === HOME ? "Internal storage" : baseName(p) || "/";
+const LIB = [["recent","Recent","clock"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
+I.search = '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>';
+
+function setHash(h, replace) { if (replace) history.replaceState(null, "", h); else if (location.hash !== h) history.pushState(null, "", h); }
+function routeFromHash(replace) {
+  const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith(":search:")) return showSearch(h.slice(8), replace);
+  if (h.startsWith(":")) { const v = h.slice(1); if (["recent","trash","backup","apps"].includes(v)) return showView(v, replace); }
+  go(h && h.startsWith("/") ? h : HOME, replace);
+}
+window.addEventListener("popstate", () => { if (S.serial) routeFromHash(true); });
+
+function beginLoad(token) {
+  S.loadToken = token; S.sel.clear(); anchor = null; closeMenu();
+  $("#content").setAttribute("aria-busy", "true"); S.loading = true;
+  setTimeout(() => { if (S.loading && S.loadToken === token) $("#content").innerHTML = '<div class="spinner" role="progressbar" aria-label="Loading"></div>'; }, 150);
+}
+function endLoad(token) { if (S.loadToken === token) { S.loading = false; $("#content").removeAttribute("aria-busy"); } }
+
+async function go(path, replace, opts = {}) {
+  if (!S.serial) return;
+  S.mode = "folder"; S.path = path; S.filter = ""; $("#filter").value = "";
+  setHash("#" + encodeURIComponent(path), replace);
+  renderCrumbs(); renderPlaces(); renderHint();
+  const token = "f:" + path + ":" + Date.now(); beginLoad(token);
+  try {
+    const r = await api("/api/ls", {path}); if (S.loadToken !== token) return;
+    S.entries = r.entries.map(e => Object.assign(e, {path: join(path, e.name)})); S.listPath = path;
+    if (opts.select) opts.select.forEach(p => S.sel.add(p));
+    render(); if (!opts.keepScroll) $("#content").scrollTop = 0;
+    if (opts.rename) { const e = S.entries.find(x => x.path === opts.rename); if (e) startRename(e); }
+    else if (opts.focus) focusEntry(opts.focus);
+  } catch(e) { if (S.loadToken !== token) return; S.entries = [];
+    const near = await nearestExisting(path); if (S.loadToken !== token) return;
+    $("#content").innerHTML = `<div class="state"><div class="big">${svg("empty")}</div><h1>Can't open this folder</h1><p>${esc(e.message)}</p><button class="btn" type="button" id="goNearest">Go to ${esc(placeLabel(near))}</button></div>`;
+    $("#goNearest").onclick = () => go(near); }
+  finally { endLoad(token); }
+}
+const refresh = () => S.mode === "folder" ? go(S.path, true, {keepScroll:true, select:[...S.sel]}) : routeFromHash(true);
+
+async function showSearch(q, replace) {
+  S.mode = "search"; S.query = q; S.filter = ""; $("#filter").value = q;
+  setHash("#" + encodeURIComponent(":search:" + q), replace); renderCrumbs(); renderPlaces(); renderHint();
+  const token = "s:" + q + Date.now(); beginLoad(token);
+  try { const r = await api("/api/search", {q}); if (S.loadToken !== token) return; S.entries = r.entries; render(); }
+  catch(e) { if (S.loadToken === token) $("#content").innerHTML = stateHTML("search", "Couldn't search", esc(e.message)); }
+  finally { endLoad(token); }
+}
+
+async function showView(v, replace) {
+  S.mode = v; S.filter = ""; $("#filter").value = "";
+  setHash("#:" + v, replace); renderCrumbs(); renderPlaces(); renderHint();
+  const token = "v:" + v + Date.now(); beginLoad(token);
+  try {
+    if (v === "recent") { const r = await api("/api/recent"); if (S.loadToken !== token) return; S.entries = r.entries; render(); }
+    else if (v === "trash") { const r = await api("/api/trash"); if (S.loadToken !== token) return;
+      S.trashDays = r.days; S.entries = r.entries.map(t => ({name:t.name, path:t.orig, dir:t.dir, size:t.size, mtime:t.time, trashId:t.id})); render(); }
+    else if (v === "backup") { await renderBackup(token); }
+    else if (v === "apps") { await renderApps(token); }
+  } catch(e) { if (S.loadToken === token) $("#content").innerHTML = stateHTML("empty", "Couldn't load this", esc(e.message)); }
+  finally { endLoad(token); }
+}
+const stateHTML = (icon, title, body, extra = "") => `<div class="state"><div class="big">${svg(icon)}</div><h1>${title}</h1><p>${body}</p>${extra}</div>`;
+
+function renderCrumbs() {
+  const c = $("#crumbs");
+  $("#upBtn").disabled = S.mode !== "folder" || S.path === "/";
+  if (S.mode !== "folder") {
+    const label = S.mode === "search" ? `Search: “${S.query}”` : (LIB.find(l => l[0] === S.mode) || [0, ""])[1];
+    c.innerHTML = `<button type="button" aria-current="page">${esc(label)}</button>`; document.title = label + " · Cellar"; return;
+  }
+  const rel = S.path.startsWith(HOME) ? S.path.slice(HOME.length) : S.path;
+  const parts = rel.split("/").filter(Boolean); const base = S.path.startsWith(HOME) ? HOME : "";
+  let html = `<button type="button" data-path="${esc(base || "/")}" data-drop="${esc(base || "/")}">${S.path.startsWith(HOME) ? "Internal storage" : "/"}</button>`; let acc = base;
+  parts.forEach(p => { acc += "/" + p; html += `<span class="sep" aria-hidden="true">/</span><button type="button" data-path="${esc(acc)}" data-drop="${esc(acc)}">${esc(p)}</button>`; });
+  c.innerHTML = html; const last = c.lastElementChild; if (last) last.setAttribute("aria-current", "page");
+  document.title = (parts[parts.length-1] || "Internal storage") + " · Cellar";
+}
+$("#crumbs").onclick = e => { const b = e.target.closest("button[data-path]"); if (b) go(b.dataset.path); };
+async function nearestExisting(p) { let cur = parentOf(p);
+  while (cur.startsWith(HOME) && cur !== HOME) { try { await api("/api/ls", {path:cur}); return cur; } catch(e) { cur = parentOf(cur); } }
+  return HOME; }
+const goUp = () => { if (S.mode === "folder" && S.path !== "/") go(parentOf(S.path), false, {focus: S.path}); };
+$("#upBtn").onclick = goUp;
+
+function renderPlaces() {
+  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => { const p = rel ? HOME + "/" + rel : HOME;
+    return `<li><button type="button" data-path="${esc(p)}" data-drop="${esc(p)}" aria-current="${S.mode === "folder" && S.path === p}">${svg(ic)}<span>${esc(label)}</span></button></li>`; }).join("");
+  $("#library").innerHTML = LIB.map(([v, label, ic]) => `<li><button type="button" data-lib="${v}" aria-current="${S.mode === v}">${svg(ic)}<span>${label}</span></button></li>`).join("");
+}
+$("#places").onclick = e => { const b = e.target.closest("button[data-path]"); if (!b) return;
+  if (/\/DCIM\/Camera$/.test(b.dataset.path) && !store.get("camview")) { S.view = "grid"; S.sort = {key:"mtime", dir:-1}; store.set("camview", "1"); store.set("view", "grid"); }
+  go(b.dataset.path); };
+$("#library").onclick = e => { const b = e.target.closest("button[data-lib]"); if (b) showView(b.dataset.lib); };
+
+/* ---------- list rendering ---------- */
+function visible() {
+  const f = S.mode === "search" ? "" : S.filter.toLowerCase(), k = S.sort.key, d = S.sort.dir;
+  const list = S.entries.filter(e => !f || e.name.toLowerCase().includes(f));
+  if (S.mode === "recent") return list;
+  return list.sort((a, b) => {
+    if (a.dir !== b.dir) return a.dir ? -1 : 1;
+    const v = k === "name" ? a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:"base"}) : (a[k] - b[k]);
+    return v * d || a.name.localeCompare(b.name);
+  });
+}
+const thumbUrl = (e, px = 400) => "/api/thumb?" + new URLSearchParams({s:S.serial, path:ep(e), m:e.mtime, z:e.size, px, t:T});
+const isCut = e => S.clip && S.clip.mode === "cut" && S.clip.paths.includes(ep(e));
+const dayKey = t => { const d = new Date(t * 1000); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); };
+const dayLabel = t => { const d = new Date(t * 1000), now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
+  if (dayKey(t) === dayKey(now / 1000)) return "Today"; if (dayKey(t) === dayKey(y / 1000)) return "Yesterday";
+  return d.toLocaleDateString(undefined, {weekday:"long", month:"short", day:"numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric"}); };
+
+function emptyState() {
+  if (S.filter && S.mode === "folder") return stateHTML("search", "No matches", `Nothing in this folder matches “${esc(S.filter)}”. Press <kbd>Enter</kbd> to search the whole phone.`);
+  if (S.mode === "search") return stateHTML("search", "Nothing found", `No file or folder on the phone has “${esc(S.query)}” in its name.`);
+  if (S.mode === "recent") return stateHTML("clock", "Nothing new", "No files on the phone changed in the last 14 days.");
+  if (S.mode === "trash") return stateHTML("trash", "Trash is empty", `Items you delete in Cellar or Finder wait here for ${S.trashDays || 30} days, so you can put them back.`);
+  return stateHTML("empty", "This folder is empty", "Drop files or folders here to copy them to the phone. On Android 11 and later, Android/data and Android/obb are blocked.");
+}
+
+function render() {
+  const list = visible(), c = $("#content");
+  S.visible = list;
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === S.view));
+  if (!list.length) { c.innerHTML = emptyState(); syncSel(); return; }
+  const cb = (e, i) => `<input type="checkbox" class="sel" data-sel="${i}" aria-label="Select ${esc(e.name)}">`;
+  const where = S.mode === "search" || S.mode === "recent" || S.mode === "trash";
+  const drag = S.mode === "folder" || S.mode === "search" || S.mode === "recent";
+  if (S.view === "grid" && S.mode !== "trash") {
+    const byDay = S.sort.key === "mtime" || S.mode === "recent"; let lastDay = null, html = "";
+    const counts = {}; if (byDay) list.forEach(e => { if (!e.dir) { const k = dayKey(e.mtime); counts[k] = (counts[k] || 0) + 1; } });
+    list.forEach((e, i) => { const k = kind(e);
+      if (byDay && !e.dir) { const dk = dayKey(e.mtime); if (dk !== lastDay) { lastDay = dk; html += `<h3 class="dayhead">${esc(dayLabel(e.mtime))}<span>${counts[dk]} item${counts[dk] > 1 ? "s" : ""}</span></h3>`; } }
+      const th = k === "image" ? `<img loading="lazy" decoding="async" alt="" src="${esc(thumbUrl(e))}" onerror="this.replaceWith(document.createRange().createContextualFragment('${svg("image").replace(/"/g,"&quot;")}'))">` : svg(k, 1.5);
+      html += `<div class="tilewrap${isCut(e) ? " cut" : ""}" data-row="${i}" ${e.dir ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><button type="button" class="tile" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ", " + fmtSize(e.size)}${isCut(e) ? ", cut" : ""}"><div class="thumb ${k === "folder" ? "folder" : ""}">${th}</div><div class="cap"><span class="nm">${esc(e.name)}</span><small>${e.dir ? "Folder" : fmtSize(e.size)}</small></div></button>${cb(e, i)}</div>`; });
+    c.innerHTML = `<div class="grid">${html}</div>`;
+  } else {
+    const col = (key, label, cls="") => { const on = S.sort.key === key && S.mode !== "recent";
+      return `<th class="${cls}" ${on ? `aria-sort="${S.sort.dir > 0 ? "ascending" : "descending"}"` : ""}><button type="button" data-sort="${key}">${label}${on ? (S.sort.dir > 0 ? " ↑" : " ↓") : ""}</button></th>`; };
+    const dateLabel = S.mode === "trash" ? "Deleted" : "Modified";
+    c.innerHTML = `<table><colgroup><col style="width:40px"><col>${where ? '<col style="width:26%">' : ""}<col style="width:100px"><col style="width:170px"><col style="width:${S.mode === "trash" ? 120 : 150}px"></colgroup>
+      <thead><tr><th class="ck"><input type="checkbox" class="sel" id="selAllBox" aria-label="Select all"></th>${col("name","Name")}${where ? `<th>${S.mode === "trash" ? "Was in" : "Where"}</th>` : ""}${col("size","Size","num")}${col("mtime", dateLabel)}<th><span class="sr">Actions</span></th></tr></thead><tbody>
+      ${list.map((e, i) => { const k = kind(e); return `<tr data-row="${i}" class="${isCut(e) ? "cut" : ""}" ${e.dir && S.mode !== "trash" ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><td class="ck">${cb(e, i)}</td><td><button type="button" class="name" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ""}${isCut(e) ? ", cut" : ""}"><span class="ico ${k === "folder" ? "folder" : ""}">${svg(k)}</span><span class="nm">${esc(e.name)}</span></button></td>
+        ${where ? `<td class="where" title="${esc(parentOf(ep(e)))}">${esc(placeLabel(parentOf(ep(e))).replace(/^0$/, "Internal storage"))}</td>` : ""}
+        <td class="num">${e.dir ? "—" : fmtSize(e.size)}</td><td class="date">${fmtDate(e.mtime)}</td>
+        <td class="act">${S.mode === "trash" ? `<button type="button" class="btn rowact" data-putback="${i}" aria-label="Put back ${esc(e.name)}">Put back</button>` : `<button type="button" class="btn rowact" data-save="${i}" aria-label="Save ${esc(e.name)} to Mac">Save to Mac</button>`}<button type="button" class="btn rowmore" data-more="${i}" aria-haspopup="menu" aria-label="More actions for ${esc(e.name)}">⋯</button></td></tr>`; }).join("")}
+      </tbody></table>`;
+  }
+  syncSel();
+}
+
+/* ---------- selection (Finder-style: checkbox, ⌘-click, shift-click, ⌘A) ---------- */
+S.sel = new Set(); let anchor = null;
+function syncSel() {
+  const list = S.visible || [];
+  const paths = new Set(list.map(ep));
+  for (const p of [...S.sel]) if (!paths.has(p)) S.sel.delete(p);
+  document.querySelectorAll("[data-row]").forEach(r => { const e = list[+r.dataset.row]; if (!e) return; const on = S.sel.has(ep(e)); r.classList.toggle("selected", on);
+    const box = r.querySelector("[data-sel]"); if (box) box.checked = on; });
+  const all = $("#selAllBox"); if (all) { all.checked = S.sel.size > 0 && S.sel.size === list.length; all.indeterminate = S.sel.size > 0 && S.sel.size < list.length; }
+  const bar = $("#selbar"), n = S.sel.size; bar.hidden = !n || S.mode === "apps" || S.mode === "backup";
+  document.querySelector("main").classList.toggle("selecting", !bar.hidden); document.body.classList.toggle("selecting", !bar.hidden);
+  if (n) { const picked = selected(), folders = picked.filter(e => e.dir).length, size = picked.reduce((a, e) => a + e.size, 0);
+    $("#selText").textContent = `${n} selected` + (size ? ` · ${fmtSize(size)}` : "") + (folders ? ` · ${folders} folder${folders > 1 ? "s" : ""}` : "");
+    $("#selAll").hidden = n === list.length;
+    $("#selSave").lastChild.textContent = S.mode === "trash" ? "Put back" : "Save to Mac";
+    $("#selTrash").setAttribute("aria-label", S.mode === "trash" ? "Delete selected items immediately" : "Move selected items to Trash"); }
+}
+const selected = () => (S.visible || []).filter(e => S.sel.has(ep(e)));
+function toggleSel(i, range) {
+  const list = S.visible;
+  if (range && anchor != null) { const [a, b] = [Math.min(anchor, i), Math.max(anchor, i)]; for (let k = a; k <= b; k++) S.sel.add(ep(list[k])); }
+  else { const p = ep(list[i]); S.sel.has(p) ? S.sel.delete(p) : S.sel.add(p); anchor = i; }
+  syncSel();
+}
+const selectAll = () => { (S.visible || []).forEach(e => S.sel.add(ep(e))); syncSel(); };
+const clearSel = () => { S.sel.clear(); anchor = null; syncSel(); };
+function focusedEntry() { const r = document.activeElement && document.activeElement.closest && document.activeElement.closest("[data-row]"); return r ? S.visible[+r.dataset.row] : null; }
+// What a command acts on: the selection, else the focused row.
+function targets() { const s = selected(); if (s.length) return s; const f = focusedEntry(); return f ? [f] : []; }
+function focusEntry(path) { const i = (S.visible || []).findIndex(e => ep(e) === path); const b = document.querySelector(`[data-i="${i}"]`); if (b) { b.focus(); b.scrollIntoView({block:"nearest"}); } }
+
+$("#content").addEventListener("click", e => {
+  const s = e.target.closest("[data-sort]");
+  if (s && S.mode !== "recent") { const k = s.dataset.sort; S.sort = { key:k, dir: S.sort.key === k ? -S.sort.dir : (k === "name" ? 1 : -1) }; store.set("sk", S.sort.key); store.set("sd", S.sort.dir); render(); return; }
+  if (e.target.id === "selAllBox") { e.target.checked ? selectAll() : clearSel(); return; }
+  const box = e.target.closest("[data-sel]"); if (box) { toggleSel(+box.dataset.sel, e.shiftKey); return; }
+  const sv = e.target.closest("[data-save]"); if (sv) { saveEntries([S.visible[+sv.dataset.save]]); return; }
+  const pb = e.target.closest("[data-putback]"); if (pb) { putBack([S.visible[+pb.dataset.putback]]); return; }
+  const mo = e.target.closest("[data-more]"); if (mo) { const ent = S.visible[+mo.dataset.more]; if (!S.sel.has(ep(ent))) { S.sel.clear(); S.sel.add(ep(ent)); syncSel(); }
+    const r = mo.getBoundingClientRect(); openMenu(entryMenu(selected()), r.right - 220, r.bottom + 4, mo); return; }
+  if (e.target.closest("input.rename")) return;
+  const it = e.target.closest("[data-i]"); if (!it) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey) { e.preventDefault(); toggleSel(+it.dataset.i, e.shiftKey); return; }
+  if (S.sel.size) { toggleSel(+it.dataset.i); return; }   // while selecting, clicks add/remove (like Photos)
+  open(S.visible[+it.dataset.i]);
+});
+$("#selAll").onclick = selectAll;
+$("#selClear").onclick = clearSel;
+$("#selSave").onclick = () => S.mode === "trash" ? putBack(selected()) : saveEntries(selected());
+$("#selTrash").onclick = () => S.mode === "trash" ? deleteForever(selected()) : trashEntries(selected());
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { S.view = b.dataset.view; store.set("view", S.view); if (S.mode !== "apps" && S.mode !== "backup") render(); });
+
+function open(e) {
+  if (S.mode === "trash") return putBack([e]);
+  if (e.dir) return go(ep(e));
+  if (previewable(e)) return preview(e);
+  saveEntries([e]);
+}
+
+/* ---------- search box: filter this folder, Enter searches the whole phone ---------- */
+$("#filter").addEventListener("input", e => { S.filter = e.target.value; if (S.mode === "folder" || S.mode === "recent" || S.mode === "trash") render(); renderHint(); });
+$("#filter").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); const v = e.target.value.trim(); if (v.length >= 2) showSearch(v); else if (v) toast("Type at least 2 characters to search the whole phone."); }
+  if (e.key === "Escape") { e.stopPropagation(); e.target.value = ""; S.filter = ""; if (S.mode === "search") go(S.path || HOME); else render(); renderHint(); $("#content").focus(); }
+});
+$("#filter").placeholder = "Search  ( ⌘F )";
+
+function renderHint() {
+  const h = $("#hint"); let html = "";
+  if (S.clip && S.clip.paths.length) {
+    const n = S.clip.paths.length, what = n === 1 ? `“${esc(baseName(S.clip.paths[0]))}”` : `${n} items`;
+    html = `${svg(S.clip.mode === "cut" ? "folder" : "file")}<span>${what} ${S.clip.mode === "cut" ? "cut" : "copied"}. Open a folder and press <kbd>⌘V</kbd> to ${S.clip.mode === "cut" ? "move" : "paste"} ${n === 1 ? "it" : "them"}${S.clip.mode === "copy" ? ", or <kbd>⌥⌘V</kbd> to move" : ""}.</span><span class="grow"></span>${S.mode === "folder" ? `<button type="button" id="hintPaste">${S.clip.mode === "cut" ? "Move here" : "Paste here"}</button>` : ""}<button type="button" id="hintClear">Cancel</button>`;
+  } else if (S.mode === "folder" && S.filter.trim().length >= 2) {
+    html = `${svg("search")}<span>Showing matches in this folder. Press <kbd>Enter</kbd> to search the whole phone for “<b>${esc(S.filter.trim())}</b>”.</span>`;
+  }
+  h.hidden = !html; h.innerHTML = html;
+  const hp = $("#hintPaste"); if (hp) hp.onclick = () => pasteClip(false);
+  const hc = $("#hintClear"); if (hc) hc.onclick = () => { S.clip = null; renderHint(); if (S.visible) render(); };
+}
+
+/* ---------- context menu (WAI-ARIA menu pattern) ---------- */
+const MENU = $("#ctxmenu"); let menuReturn = null;
+function openMenu(items, x, y, returnTo) {
+  closeMenu(); menuReturn = returnTo || document.activeElement;
+  MENU.innerHTML = items.map((it, i) => it === "-" ? '<hr role="separator">' :
+    `<button type="button" role="menuitem" data-m="${i}" ${it.disabled ? "disabled" : ""} class="${it.danger ? "danger" : ""}">${esc(it.label)}<span>${it.key || ""}</span></button>`).join("");
+  MENU.hidden = false;
+  const w = MENU.offsetWidth, h = MENU.offsetHeight;
+  MENU.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px"; MENU.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
+  MENU.onclick = e => { const b = e.target.closest("[data-m]"); if (!b || b.disabled) return; const it = items[+b.dataset.m]; closeMenu(true); it.run(); };
+  const btns = () => [...MENU.querySelectorAll("button:not([disabled])")];
+  MENU.onkeydown = e => { const list = btns(), i = list.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+    else if (e.key === "Home") { e.preventDefault(); list[0].focus(); } else if (e.key === "End") { e.preventDefault(); list[list.length - 1].focus(); }
+    else if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); closeMenu(true); } };
+  const first = btns()[0]; if (first) first.focus();
+}
+function closeMenu(restore) { if (MENU.hidden) return; MENU.hidden = true; MENU.innerHTML = ""; if (restore && menuReturn && menuReturn.focus) menuReturn.focus(); }
+document.addEventListener("mousedown", e => { if (!MENU.hidden && !MENU.contains(e.target)) closeMenu(); });
+window.addEventListener("blur", () => closeMenu());
+
+function entryMenu(list) {
+  const one = list.length === 1 ? list[0] : null, files = list.filter(e => !e.dir);
+  if (S.mode === "trash") return [
+    {label: "Put back", key: "↩", run: () => putBack(list)},
+    {label: "Save to Mac", key: "⌘S", run: () => saveEntries(list)}, "-",
+    {label: "Delete immediately…", key: "⌘⌫", danger: true, run: () => deleteForever(list)}];
+  const items = [];
+  if (one) items.push({label: one.dir ? "Open" : previewable(one) ? "Preview" : "Open", key: one.dir ? "⌘↓" : "Space", run: () => open(one)});
+  if (one && !one.dir) items.push({label: "Open with Mac app", key: "", run: () => openOnMac(one)});
+  if (S.mode !== "folder" && one) items.push({label: "Show in enclosing folder", key: "", run: () => go(parentOf(ep(one)), false, {focus: ep(one)})});
+  items.push({label: list.length > 1 ? `Save ${list.length} items to Mac` : "Save to Mac", key: "⌘S", run: () => saveEntries(list)}, "-",
+    {label: "Cut", key: "⌘X", run: () => setClip(list, "cut")},
+    {label: "Copy", key: "⌘C", run: () => setClip(list, "copy")},
+    {label: "Paste", key: "⌘V", disabled: !S.clip || S.mode !== "folder", run: () => pasteClip(false)},
+    {label: "Duplicate", key: "⌘D", run: () => duplicate(list)}, "-");
+  if (one) items.push({label: "Rename", key: "F2", run: () => startRename(one)});
+  items.push({label: "Move to Trash", key: "⌘⌫", danger: true, run: () => trashEntries(list)});
+  return items;
+}
+function folderMenu() {
+  return [{label: "New folder", key: "⌥⌘N", run: newFolder},
+    {label: "Paste", key: "⌘V", disabled: !S.clip, run: () => pasteClip(false)},
+    {label: "Move here", key: "⌥⌘V", disabled: !S.clip, run: () => pasteClip(true)}, "-",
+    {label: "Add files…", key: "", run: () => $("#fileInput").click()},
+    {label: "Add folder…", key: "", run: () => $("#folderInput").click()}, "-",
+    {label: "Select all", key: "⌘A", disabled: !(S.visible || []).length, run: selectAll},
+    {label: "Refresh", key: "", run: refresh}];
+}
+$("#content").addEventListener("contextmenu", e => {
+  if (S.mode === "apps" || S.mode === "backup" || e.target.closest("input.rename")) return;
+  const row = e.target.closest("[data-row]"); e.preventDefault();
+  if (row) { const ent = S.visible[+row.dataset.row]; if (!S.sel.has(ep(ent))) { S.sel.clear(); S.sel.add(ep(ent)); anchor = +row.dataset.row; syncSel(); }
+    openMenu(entryMenu(selected()), e.clientX, e.clientY, row.querySelector("[data-i]")); }
+  else if (S.mode === "folder") { clearSel(); openMenu(folderMenu(), e.clientX, e.clientY, $("#content")); }
+});
+$("#addBtn").onclick = () => { const r = $("#addBtn").getBoundingClientRect(); $("#addBtn").setAttribute("aria-expanded", "true");
+  openMenu([{label: "Files…", key: "", run: () => $("#fileInput").click()}, {label: "Folder…", key: "", run: () => $("#folderInput").click()}], r.right - 220, r.bottom + 6, $("#addBtn")); };
+new MutationObserver(() => { if (MENU.hidden) $("#addBtn").setAttribute("aria-expanded", "false"); }).observe(MENU, {attributes: true, attributeFilter: ["hidden"]});
+
+/* ---------- dialogs: confirm + conflicts ---------- */
+function confirmDialog(title, body, okLabel, danger) {
+  const d = $("#confirm"), back = document.activeElement;
+  $("#cnTitle").textContent = title; $("#cnBody").innerHTML = body; $("#cnOk").textContent = okLabel;
+  $("#cnOk").className = "btn " + (danger ? "danger" : "primary");
+  return new Promise(ok => {
+    const done = v => { d.close(); ok(v); if (back && back.focus) back.focus(); };
+    $("#cnOk").onclick = () => done(true); $("#cnCancel").onclick = () => done(false);
+    d.oncancel = e => { e.preventDefault(); done(false); };
+    d.showModal(); (danger ? $("#cnCancel") : $("#cnOk")).focus();
+  });
+}
+// incoming: [{name, dir, size, mtime}] ; existing: {name: {dir,size,mtime}} → Map(name → policy) | null when stopped. Skipped names are absent.
+async function resolveConflicts(incoming, existing, whereLabel) {
+  const out = new Map(), clashes = incoming.filter(x => existing[x.name]);
+  incoming.forEach(x => { if (!existing[x.name]) out.set(x.name, "new"); });
+  let all = null;
+  for (let i = 0; i < clashes.length; i++) {
+    const x = clashes[i], ex = existing[x.name];
+    let choice = all;
+    if (!choice) choice = await askConflict(x, ex, whereLabel, clashes.length - i);
+    if (choice === "stop") return null;
+    if (choice.endsWith("!")) { choice = choice.slice(0, -1); all = choice; }
+    if (choice === "skip") continue;
+    out.set(x.name, choice === "replace" ? (x.dir && ex.dir ? "merge" : "replace") : "new");
+  }
+  return out;
+}
+function askConflict(x, ex, whereLabel, remaining) {
+  const d = $("#conflict"), back = document.activeElement, folder = x.dir && ex.dir;
+  $("#cfTitle").textContent = `“${x.name}” is already in ${whereLabel}`;
+  $("#cfDetail").textContent = folder ? "Merge adds the new files to the existing folder and replaces files with the same name." : "Replace overwrites the existing item. Keep both adds a number to the new one.";
+  const newer = (x.mtime || 0) > (ex.mtime || 0);
+  const box = (label, it, isNewer) => `<div class="${isNewer ? "newer" : ""}"><b>${label}${isNewer ? " · newer" : ""}</b><span>${it.dir ? "Folder" : fmtSize(it.size || 0)}</span><span class="muted">${it.mtime ? fmtDate(it.mtime) : ""}</span></div>`;
+  const older = x.mtime && ex.mtime && x.mtime < ex.mtime;
+  $("#cfCompare").innerHTML = box("Copying", x, newer && !folder && ex.mtime) + box("Already there", ex, older && !folder);
+  $("#cfReplace").textContent = folder ? "Merge" : "Replace";
+  $("#cfAllWrap").hidden = remaining <= 1; $("#cfAll").checked = false; $("#cfAllText").textContent = `Do this for all ${remaining} conflicts`;
+  return new Promise(ok => {
+    const done = v => { d.close(); if (back && back.focus) back.focus(); ok(v); };
+    d.querySelectorAll("[data-cf]").forEach(b => b.onclick = () => { const v = b.dataset.cf; done(v !== "stop" && $("#cfAll").checked ? v + "!" : v); });
+    d.oncancel = e => { e.preventDefault(); done("stop"); };
+    d.showModal(); $("#cfReplace").focus();
+  });
+}
+
+/* ---------- transfers (server-side queue) ---------- */
+S.jobs = []; S.localJobs = []; const jobDone = {}; let txTimer = null, txSeen = {};
+function trackJob(job, onDone) { if (onDone) jobDone[job.id] = onDone; delete $("#transfers").dataset.userClosed; announce(`Started: ${job.title}`); pollJobs(true); }
+async function pollJobs(soon) {
+  clearTimeout(txTimer);
+  try { S.jobs = (await api("/api/jobs")).jobs; } catch(e) {}
+  for (const j of S.jobs) {
+    const fin = ["done", "error", "cancelled"].includes(j.state);
+    if (fin && !txSeen[j.id]) { txSeen[j.id] = true;
+      if (jobDone[j.id]) { try { jobDone[j.id](j); } catch(e) {} delete jobDone[j.id]; announce(`${j.state === "done" ? "Finished" : j.state === "cancelled" ? "Cancelled" : "Failed"}: ${j.title}`); }
+    }
+    if (!fin) txSeen[j.id] = false;
+  }
+  renderTransfers();
+  const active = S.jobs.some(j => j.state === "queued" || j.state === "running") || S.localJobs.length;
+  txTimer = setTimeout(pollJobs, active ? 800 : 5000);
+}
+const fmtTime = s => s < 60 ? `${Math.max(1, Math.round(s))} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+let txIdleSince = 0, txUserOpened = 0;
+function renderTransfers() {
+  const live = j => j.state === "running" || j.state === "queued";
+  const jobs = [...S.localJobs, ...S.jobs], active = jobs.filter(live), done = jobs.filter(j => !live(j)).slice(0, 5);
+  const all = [...active, ...done], box = $("#transfers");
+  box.hidden = !all.length; if (!all.length) return;
+  const running = active.length;
+  if (running) { txIdleSince = 0; if (box.classList.contains("collapsed") && Date.now() - txUserOpened > 0 && !box.dataset.userClosed) { box.classList.remove("collapsed"); $("#txHead").setAttribute("aria-expanded", "true"); } }
+  else { if (!txIdleSince) txIdleSince = Date.now();
+    if (Date.now() - txIdleSince > 6000 && Date.now() - txUserOpened > 15000 && !box.classList.contains("collapsed")) { box.classList.add("collapsed"); $("#txHead").setAttribute("aria-expanded", "false"); } }
+  const fails = done.filter(j => j.state === "error" || (j.errors && j.errors.length)).length;
+  $("#txTitle").textContent = running ? `Transfers · ${running} in progress` : fails ? `Transfers · ${fails} with problems` : "Transfers · all done";
+  $("#txList").innerHTML = all.map(j => {
+    const pct = j.total ? Math.min(100, j.done / j.total * 100) : (j.items_total ? j.items_done / j.items_total * 100 : 0);
+    let st = "", r2 = "";
+    if (j.state === "queued") st = "Waiting";
+    else if (j.state === "running") { st = j.total ? `${Math.floor(pct)}%` : "";
+      const eta = j.speed > 0 && j.total ? (j.total - j.done) / j.speed : 0;
+      r2 = `<span>${j.total ? `${fmtSize(j.done)} of ${fmtSize(j.total)}` : ""}${j.items_total > 1 ? ` · ${j.items_done} of ${j.items_total}` : ""}${j.current ? ` · ${esc(j.current)}` : ""}</span><span>${j.speed > 1e5 ? fmtSize(j.speed) + "/s" : ""}${eta > 2 ? ` · ${fmtTime(eta)} left` : ""}</span>`; }
+    else if (j.state === "done") { st = j.errors && j.errors.length ? `<span class="st err">${j.errors.length} failed</span>` : '<span class="st ok">Done ✓</span>';
+      r2 = j.result && j.result.dest && j.kind === "pull" ? `<span>${esc(j.result.dest.replace(/^.*\/(Downloads|Pictures)\//, "$1/"))}</span><button type="button" data-reveal="${esc(j.result.saved && j.result.saved.length === 1 ? j.result.saved[0] : j.result.dest)}">Show in Finder</button>` : ""; }
+    else if (j.state === "cancelled") st = "Cancelled";
+    else st = '<span class="st err">Failed</span>';
+    const errs = j.errors && j.errors.length ? `<details><summary>${j.errors.length === 1 ? esc(j.errors[0][1] || "Failed") : "See what failed"}</summary><ul>${j.errors.slice(0, 20).map(e => `<li>${esc(e[0] || "")}${e[0] ? ": " : ""}${esc(e[1])}</li>`).join("")}</ul></details>` : "";
+    const cancel = j.state === "running" || j.state === "queued" ? `<button type="button" class="x" data-cancel="${esc(j.id)}" aria-label="Cancel ${esc(j.title)}">✕</button>` : "";
+    return `<li><div class="r1"><span class="t">${esc(j.title)}</span><span class="st">${st}</span>${cancel}</div>${j.state === "running" ? `<div class="bar" role="progressbar" aria-label="${esc(j.title)}" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>` : ""}${r2 ? `<div class="r2">${r2}</div>` : ""}${errs}</li>`;
+  }).join("");
+}
+$("#txList").onclick = e => {
+  const c = e.target.closest("[data-cancel]"); if (c) { const lj = S.localJobs.find(x => x.id === c.dataset.cancel); if (lj) lj.abort(); else api("/api/jobs/cancel", {id: c.dataset.cancel}, {method:"POST"}).then(() => pollJobs()); }
+  const r = e.target.closest("[data-reveal]"); if (r) api("/api/reveal", {path: r.dataset.reveal}, {method:"POST"});
+};
+$("#txHead").onclick = () => { const b = $("#txHead"), open = b.getAttribute("aria-expanded") !== "true"; b.setAttribute("aria-expanded", open); $("#transfers").classList.toggle("collapsed", !open);
+  if (open) { txUserOpened = Date.now(); delete $("#transfers").dataset.userClosed; } else $("#transfers").dataset.userClosed = "1"; };
+$("#txClear").onclick = async () => { await api("/api/jobs/clear", {}, {method:"POST"}).catch(() => {}); pollJobs(); };
+function announce(t) { const a = $("#announce"); a.textContent = ""; setTimeout(() => a.textContent = t, 50); }
+const postJob = body => api("/api/jobs", {}, {method:"POST", body: JSON.stringify(body), headers: {"Content-Type": "application/json"}});
+const postJSON = (path, body, params = {}) => api(path, params, {method:"POST", body: JSON.stringify(body), headers: {"Content-Type": "application/json"}});
+
+/* ---------- undo ---------- */
+S.undo = [];
+function pushUndo(label, fn) { S.undo.push({label, fn}); if (S.undo.length > 30) S.undo.shift(); }
+async function undoLast() {
+  const u = S.undo.pop(); if (!u) return toast("Nothing to undo");
+  try { await u.fn(); toast(`Undid ${u.label}`); } catch(e) { toast(`Couldn't undo ${u.label}: ${e.message}`, {err:true}); }
+}
+function undoToast(msg, label, fn) { pushUndo(label, fn);
+  toast(msg, {ms: 10000, action: ["Undo", async () => { const i = S.undo.findIndex(u => u.fn === fn); if (i >= 0) S.undo.splice(i, 1);
+    try { await fn(); toast(`Undid ${label}`); } catch(e) { toast(`Couldn't undo: ${e.message}`, {err:true}); } }]}); }
+
+/* ---------- file operations ---------- */
+async function phoneOp(list, dest, op) {
+  if (!list.length || !S.serial) return;
+  list = list.filter(e => !(op === "move" && parentOf(ep(e)) === dest));
+  if (!list.length) return;
+  const bad = list.find(e => dest === ep(e) || dest.startsWith(ep(e) + "/"));
+  if (bad) return toast(`“${bad.name}” can't go inside itself.`, {err:true});
+  const sameDir = list.every(e => parentOf(ep(e)) === dest);
+  let policies = new Map(list.map(e => [e.name, "new"]));
+  if (!sameDir) {
+    const ex = (await postJSON("/api/check", {side:"phone", dir:dest, names:list.map(e => e.name)})).existing;
+    policies = await resolveConflicts(list, ex, placeLabel(dest)); if (!policies) return;
+  }
+  const items = list.filter(e => policies.has(e.name)).map(e => ({path: ep(e), policy: policies.get(e.name)}));
+  if (!items.length) return;
+  const job = await postJob({kind:"phoneop", op, items, dest});
+  trackJob(job, j => {
+    if (S.mode === "folder" && (S.path === dest || items.some(i => parentOf(i.path) === S.path))) refresh();
+    const r = j.result || {};
+    if (op === "move" && r.moves && r.moves.length) {
+      undoToast(`Moved ${r.moves.length === 1 ? `“${baseName(r.moves[0].to)}”` : r.moves.length + " items"} to ${placeLabel(dest)}`, "move", async () => {
+        const groups = {}; r.moves.forEach(m => { const d = parentOf(m.from); (groups[d] = groups[d] || []).push({path: m.to, as: baseName(m.from)}); });
+        for (const d in groups) { const jb = await postJob({kind:"phoneop", op:"move", items: groups[d], dest: d}); await waitJob(jb.id); }
+        refresh(); });
+    } else if (op === "copy" && r.created && r.created.length) {
+      undoToast(`Copied ${r.created.length === 1 ? `“${baseName(r.created[0])}”` : r.created.length + " items"} to ${placeLabel(dest)}`, "copy", async () => {
+        await postJSON("/api/trash", {paths: r.created}); refresh(); });
+    }
+    if (j.errors && j.errors.length) toast(`${j.errors.length} item${j.errors.length > 1 ? "s" : ""} couldn't be ${op === "move" ? "moved" : "copied"}: ${j.errors[0][1]}`, {err:true});
+  });
+}
+async function waitJob(id) { for (let i = 0; i < 600; i++) { const j = (await api("/api/jobs")).jobs.find(x => x.id === id); if (!j || ["done","error","cancelled"].includes(j.state)) return j; await new Promise(r => setTimeout(r, 400)); } }
+
+function setClip(list, mode) {
+  if (!list.length) return;
+  S.clip = {mode, paths: list.map(ep), entries: list.map(e => Object.assign({}, e, {path: ep(e)}))};
+  S.sel.clear(); anchor = null; renderHint(); render();
+  announce(`${list.length === 1 ? list[0].name : list.length + " items"} ${mode === "cut" ? "cut" : "copied"}`);
+}
+async function pasteClip(forceMove) {
+  if (!S.clip) return; if (S.mode !== "folder") return toast("Open a folder first, then paste.", {err:true});
+  const move = forceMove || S.clip.mode === "cut", list = S.clip.entries;
+  if (move) { S.clip = null; renderHint(); }
+  await phoneOp(list, S.path, move ? "move" : "copy");
+}
+const duplicate = list => phoneOp(list.map(e => Object.assign({}, e, {path: ep(e)})), parentOf(ep(list[0])), "copy");
+
+async function trashEntries(list) {
+  if (!list.length) return;
+  try {
+    const r = await postJSON("/api/trash", {paths: list.map(ep)});
+    const ids = r.items.map(i => i.id);
+    S.sel.clear(); refresh();
+    if (r.failed) toast(`${r.failed} item${r.failed > 1 ? "s" : ""} couldn't be moved to the Trash.`, {err:true});
+    if (ids.length) undoToast(`Moved ${ids.length === 1 ? `“${r.items[0].name}”` : ids.length + " items"} to Trash`, "move to Trash", async () => { await postJSON("/api/untrash", {ids}); refresh(); });
+  } catch(e) { toast(e.message, {err:true}); }
+}
+async function putBack(list) {
+  const ids = list.map(e => e.trashId).filter(Boolean); if (!ids.length) return;
+  try { const r = await postJSON("/api/untrash", {ids}); toast(`Put back ${r.restored.length === 1 ? `“${baseName(r.restored[0])}” in ${placeLabel(parentOf(r.restored[0]))}` : r.restored.length + " items"}`,
+    r.restored.length === 1 ? {action: ["Show", () => go(parentOf(r.restored[0]), false, {focus: r.restored[0]})]} : {}); refresh(); }
+  catch(e) { toast(e.message, {err:true}); }
+}
+async function deleteForever(list) {
+  const ids = list.map(e => e.trashId).filter(Boolean); if (!ids.length) return;
+  const ok = await confirmDialog(`Delete ${ids.length === 1 ? `“${list[0].name}”` : ids.length + " items"} immediately?`, "This can't be undone. The files are removed from the phone for good.", "Delete", true);
+  if (!ok) return;
+  try { await postJSON("/api/trash/empty", {ids}); toast("Deleted"); refresh(); } catch(e) { toast(e.message, {err:true}); }
+}
+async function emptyTrash() {
+  const n = (S.entries || []).length; if (!n) return;
+  if (!await confirmDialog(`Empty the Trash?`, `${n} item${n > 1 ? "s" : ""} will be removed from the phone for good. This can't be undone.`, "Empty Trash", true)) return;
+  try { await postJSON("/api/trash/empty", {}); toast("Trash emptied"); refresh(); } catch(e) { toast(e.message, {err:true}); }
+}
+
+async function newFolder() {
+  if (S.mode !== "folder") return toast("Open a folder first.", {err:true});
+  try { const r = await postJSON("/api/newfolder", {dir: S.path});
+    pushUndo("new folder", async () => { await postJSON("/api/trash", {paths: [r.path]}); refresh(); });
+    go(S.path, true, {keepScroll: true, rename: r.path}); }
+  catch(e) { toast(e.message, {err:true}); }
+}
+$("#newFolderBtn").onclick = newFolder;
+
+function startRename(e) {
+  const i = (S.visible || []).findIndex(x => ep(x) === ep(e)); const btn = document.querySelector(`[data-i="${i}"]`); if (!btn) return;
+  const span = btn.querySelector(".nm"); if (!span) return;
+  const input = document.createElement("input"); input.className = "rename"; input.value = e.name; input.setAttribute("aria-label", `New name for ${e.name}`);
+  btn.hidden = true; btn.after(input); const rowEl = btn.closest("[data-row]"); if (rowEl) rowEl.setAttribute("draggable", "false");
+  input.focus(); const dot = e.dir ? -1 : e.name.lastIndexOf("."); input.setSelectionRange(0, dot > 0 ? dot : e.name.length);
+  let done = false;
+  const finish = async commit => {
+    if (done) return; done = true;
+    const name = input.value.trim();
+    if (!commit || !name || name === e.name) { render(); focusEntry(ep(e)); return; }
+    if (name === input.dataset.failed) { done = false; return; }
+    try { const r = await postJSON("/api/rename", {path: ep(e), name});
+      pushUndo("rename", async () => { await postJSON("/api/rename", {path: r.to, name: e.name}); refresh(); });
+      go(S.mode === "folder" ? S.path : parentOf(r.to), true, {keepScroll: true, focus: r.to}); }
+    catch(err) { toast(err.message, {err:true}); input.dataset.failed = name; done = false; input.focus(); input.select(); }
+  };
+  input.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Enter") { ev.preventDefault(); finish(true); } if (ev.key === "Escape") { ev.preventDefault(); finish(false); } });
+  input.addEventListener("click", ev => ev.stopPropagation());
+  input.addEventListener("blur", () => finish(input.value.trim() !== input.dataset.failed));
+}
+
+/* ---------- save to Mac ---------- */
+function stamp() { const d = new Date(), pad = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}.${pad(d.getSeconds())}`; }
+async function saveEntries(list) {
+  if (!list.length) return;
+  try {
+    let body;
+    if (list.length === 1) {
+      const e = list[0], ex = (await postJSON("/api/check", {side:"mac", names:[e.name]})).existing;
+      const pol = await resolveConflicts([e], ex, "Downloads/Cellar"); if (!pol || !pol.has(e.name)) return;
+      body = {kind:"pull", items:[{path: ep(e), policy: pol.get(e.name)}]};
+    } else {
+      const from = S.mode === "folder" ? placeLabel(S.listPath) : (S.mode === "search" ? "Search" : S.mode === "trash" ? "Trash" : "Recent");
+      body = {kind:"pull", into: `${from} ${stamp()}`, items: list.map(e => ({path: ep(e)}))};
+    }
+    const job = await postJob(body); clearSel();
+    trackJob(job, j => { if (j.state !== "done") return;
+      const target = j.result.saved && j.result.saved.length === 1 ? j.result.saved[0] : j.result.dest;
+      toast(list.length === 1 ? `Saved “${baseName(target)}” to Downloads/Cellar` : `Saved ${j.result.saved.length} items`, {action: ["Show in Finder", () => api("/api/reveal", {path: target}, {method:"POST"})], ms: 8000}); });
+  } catch(e) { toast(e.message, {err:true}); }
+}
+$("#revealBtn").onclick = () => api("/api/reveal", {}, {method:"POST"});
+async function openOnMac(e) {
+  const t = toast(`Opening “${e.name}” on your Mac…`, {ms: 120000});
+  try { await api("/api/openmac", {path: ep(e)}, {method:"POST"}); t.remove(); toast("Opened on your Mac. Changes you save there are copied back to the phone.", {ms: 8000}); }
+  catch(err) { t.remove(); toast(err.message, {err:true}); }
+}
+
+/* ---------- drag to move (internal) and drag out (Chrome: to Finder) ---------- */
+const DV_TYPE = "application/x-cellar";
+$("#content").addEventListener("dragstart", e => {
+  const row = e.target.closest && e.target.closest("[data-row][draggable=true]"); if (!row) return;
+  const ent = S.visible[+row.dataset.row];
+  if (!S.sel.has(ep(ent))) { S.sel.clear(); S.sel.add(ep(ent)); syncSel(); }
+  const list = selected();
+  e.dataTransfer.effectAllowed = "copyMove";
+  e.dataTransfer.setData(DV_TYPE, JSON.stringify(list.map(x => Object.assign({}, x, {path: ep(x)}))));
+  e.dataTransfer.setData("text/plain", list.map(x => x.name).join("\n"));
+  if (list.length === 1 && !list[0].dir) {  // Chrome turns this into a real file when dropped in Finder
+    const mime = (EXT.image.includes(kind(list[0])) ? "image/*" : "application/octet-stream");
+    e.dataTransfer.setData("DownloadURL", `${mime}:${list[0].name}:${location.origin}${fileUrl(ep(list[0]), true)}`);
+  }
+  const ghost = document.createElement("div"); ghost.textContent = list.length === 1 ? list[0].name : `${list.length} items`;
+  ghost.style.cssText = "position:fixed;top:-100px;padding:6px 10px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font:600 13px system-ui";
+  document.body.appendChild(ghost); e.dataTransfer.setDragImage(ghost, 10, 10); setTimeout(() => ghost.remove(), 0);
+  S.dragging = list;
+});
+document.addEventListener("dragend", () => { S.dragging = null; document.querySelectorAll(".droptarget").forEach(x => x.classList.remove("droptarget")); });
+function dropTargetOf(e) { const t = e.target.closest && e.target.closest("[data-drop]"); return t; }
+document.addEventListener("dragover", e => {
+  const t = dropTargetOf(e); const internal = e.dataTransfer.types.includes(DV_TYPE);
+  document.querySelectorAll(".droptarget").forEach(x => { if (x !== t) x.classList.remove("droptarget"); });
+  if (t && (internal || e.dataTransfer.types.includes("Files"))) {
+    if (internal && S.dragging && S.dragging.some(x => t.dataset.drop === x.path || t.dataset.drop.startsWith(x.path + "/"))) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = internal ? (e.altKey ? "copy" : "move") : "copy"; t.classList.add("droptarget");
+  }
+});
+document.addEventListener("drop", e => {
+  const t = dropTargetOf(e); if (!t) return;
+  const raw = e.dataTransfer.getData(DV_TYPE); t.classList.remove("droptarget");
+  if (raw) { e.preventDefault(); e.stopPropagation(); phoneOp(JSON.parse(raw), t.dataset.drop, e.altKey ? "copy" : "move"); }
+}, true);
+
+/* ---------- preview ---------- */
+const V = $("#viewer"); let current = null, lastFocus = null;
+async function preview(e) {
+  current = e; if (!V.open) { lastFocus = document.activeElement; V.showModal(); }
+  const k = kind(e), body = $("#vBody"), heic = /\.(heic|heif)$/i.test(e.name);
+  const url = heic ? thumbUrl(e, 2048) : fileUrl(ep(e));
+  $("#vTitle").innerHTML = `${esc(e.name)}<small>${fmtSize(e.size)} · ${fmtDate(e.mtime)}</small>`;
+  const list = (S.visible || []).filter(previewable), i = list.indexOf(e);
+  $("#vPrev").disabled = i <= 0; $("#vNext").disabled = i < 0 || i >= list.length - 1;
+  if (k === "image") body.innerHTML = `<img src="${esc(url)}" alt="${esc(e.name)}">`;
+  else if (k === "video") body.innerHTML = `<video src="${esc(url)}" controls autoplay playsinline></video>`;
+  else if (k === "audio") body.innerHTML = `<audio src="${esc(url)}" controls autoplay></audio>`;
+  else if (k === "pdf") body.innerHTML = `<iframe src="${esc(url)}" title="${esc(e.name)}"></iframe>`;
+  else { body.innerHTML = '<div class="spinner"></div>';
+    try { const r = await fetch(url, {headers:{Range:"bytes=0-262143"}}); const txt = await r.text(); if (current !== e) return;
+      body.innerHTML = `<pre>${esc(txt)}${e.size > 262144 ? "\n\n… (showing the first 256 KB)" : ""}</pre>`; }
+    catch(err) { body.innerHTML = `<p>${esc(err.message)}</p>`; } }
+}
+function step(d) { const list = (S.visible || []).filter(previewable), i = list.indexOf(current); if (list[i + d]) preview(list[i + d]); }
+$("#vPrev").onclick = () => step(-1); $("#vNext").onclick = () => step(1);
+$("#vClose").onclick = () => V.close();
+$("#vSave").onclick = () => { if (current && current.name) saveEntries([current]); else if (current && current.blob) { const a = document.createElement("a"); a.href = current.blob; a.download = current.fname; a.click(); } };
+V.addEventListener("close", () => { $("#vBody").innerHTML = ""; current = null; if (lastFocus) lastFocus.focus(); });
+V.addEventListener("click", e => { if (e.target === V) V.close(); });
+V.addEventListener("keydown", e => { if (e.key === "ArrowLeft") step(-1); if (e.key === "ArrowRight") step(1); });
+
+/* ---------- wireless ---------- */
+const W = $("#wifi"); let qrPoll = null, wFocus = null;
+function wStatus(text, kind) { const el = $("#wStatus"); el.hidden = !text; el.className = "wstatus " + (kind || ""); $("#wStatusText").textContent = text || ""; }
+function openWifi(tab) { wFocus = document.activeElement; if (!W.open) W.showModal(); setTab(tab || "qr"); }
+function setTab(t) {
+  document.querySelectorAll("#wifi [role=tab]").forEach(b => { const on = b.dataset.tab === t; b.setAttribute("aria-selected", on); b.tabIndex = on ? 0 : -1; });
+  document.querySelectorAll("#wifi [data-panel]").forEach(p => p.hidden = p.dataset.panel !== t);
+  wStatus(""); stopQr();
+  if (t === "qr") startQr(); if (t === "ip") renderKnown();
+}
+document.querySelectorAll("#wifi [role=tab]").forEach(b => {
+  b.onclick = () => setTab(b.dataset.tab);
+  b.onkeydown = e => { if (!["ArrowLeft","ArrowRight"].includes(e.key)) return; const all = [...document.querySelectorAll("#wifi [role=tab]")];
+    const n = all[(all.indexOf(b) + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length]; n.focus(); setTab(n.dataset.tab); };
+});
+$("#wClose").onclick = () => W.close();
+W.addEventListener("click", e => { if (e.target === W) W.close(); });
+W.addEventListener("close", () => { stopQr(); if (wFocus) wFocus.focus(); });
+function connected(addr) { toast(`Connected over Wi-Fi${addr ? " (" + addr + ")" : ""}`); W.close(); refreshDevices(); }
+
+let qrLib = null;
+function loadQrLib() { return qrLib || (qrLib = new Promise((ok, no) => { const s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"; s.onload = ok; s.onerror = () => { qrLib = null; no(); }; document.head.appendChild(s); })); }
+async function startQr() {
+  $("#qrBox").innerHTML = '<div class="ph">Making a code…</div>';
+  try {
+    const r = await api("/api/wifi/qr/start", {}, {method:"POST"});
+    if ($("#p-qr").hidden || !W.open) return api("/api/wifi/qr/stop", {}, {method:"POST"}).catch(() => {});
+    try { await loadQrLib(); const q = qrcode(0, "M"); q.addData(r.payload); q.make(); $("#qrBox").innerHTML = q.createSvgTag({cellSize:4, margin:0, scalable:true}); }
+    catch(e) { $("#qrBox").innerHTML = '<div class="ph">Couldn\'t load the QR code (are you offline?). Use <b>Pairing code</b> instead.</div>'; return; }
+    if ($("#p-qr").hidden || !W.open) { api("/api/wifi/qr/stop", {}, {method:"POST"}).catch(() => {}); return; }
+    wStatus("Waiting for your phone to scan…", "busy");
+    qrPoll = setInterval(async () => {
+      let st; try { st = await api("/api/wifi/qr/status"); } catch(e) { return; }
+      if (st.state === "pairing") wStatus("Phone found. Pairing…", "busy");
+      else if (st.state === "connecting") wStatus("Paired. Connecting…", "busy");
+      else if (st.state === "connected") { stopQr(true); connected(st.address); }
+      else if (st.state === "paired") { stopQr(true); wStatus("Paired, but your Mac can't find the phone's connect port yet. Open the IP address tab and enter the IP address & port shown under Wireless debugging.", "err"); }
+      else if (st.state === "error") { stopQr(true); wStatus(st.message, "err"); }
+    }, 1500);
+  } catch(e) { wStatus(e.message, "err"); }
+}
+function stopQr(keepServer) { if (qrPoll) { clearInterval(qrPoll); qrPoll = null; if (!keepServer) api("/api/wifi/qr/stop", {}, {method:"POST"}).catch(() => {}); } }
+
+async function busy(form, fn) { const b = form.querySelector("button[type=submit]"), label = b.textContent; b.disabled = true;
+  try { await fn(); } catch(e) { wStatus(e.message, "err"); } finally { b.disabled = false; b.textContent = label; } }
+$("#pairForm").onsubmit = e => { e.preventDefault(); busy(e.target, async () => {
+  wStatus("Pairing… keep the pairing popup open on the phone.", "busy");
+  const r = await api("/api/wifi/pair", {addr: $("#pairAddr").value, code: $("#pairCode").value}, {method:"POST"});
+  if (r.address) return connected(r.address);
+  setTab("ip"); wStatus("Paired. Now enter the IP address & port shown on the main Wireless debugging screen. It uses a different port from the pairing popup.", "ok");
+  $("#ipAddr").value = $("#pairAddr").value.split(":")[0] + ":"; $("#ipAddr").focus(); }); };
+$("#ipForm").onsubmit = e => { e.preventDefault(); busy(e.target, async () => {
+  wStatus("Connecting…", "busy"); const r = await api("/api/wifi/connect", {addr: $("#ipAddr").value}, {method:"POST"}); connected(r.address); }); };
+async function renderKnown() {
+  let k = []; try { k = (await api("/api/wifi/known")).known; } catch(e) {}
+  $("#knownBox").innerHTML = k.length ? `<p class="label" style="padding:0;margin-bottom:8px">Recent</p><ul class="known">${k.map(a =>
+    `<li><span>${esc(a)}</span><button class="btn" type="button" data-conn="${esc(a)}">Connect</button><button class="btn quiet" type="button" data-forget="${esc(a)}" aria-label="Forget ${esc(a)}">Forget</button></li>`).join("")}</ul>` : "";
+}
+$("#knownBox").onclick = async e => {
+  const c = e.target.closest("[data-conn]"), f = e.target.closest("[data-forget]");
+  if (c) { $("#ipAddr").value = c.dataset.conn; $("#ipForm").requestSubmit(); }
+  if (f) { await api("/api/wifi/forget", {addr: f.dataset.forget}, {method:"POST"}); renderKnown(); }
+};
+
+/* ---------- screenshot ---------- */
+$("#shotBtn").onclick = async () => {
+  if (!S.serial) return toast("Connect a phone first", {err:true});
+  const t = toast("Capturing the phone screen…");
+  try { const r = await fetch("/api/screenshot?" + new URLSearchParams({s:S.serial, t:T})); if (!r.ok) throw new Error((await r.json()).error);
+    const blob = URL.createObjectURL(await r.blob()); t.remove();
+    const stamp = new Date().toISOString().slice(0,19).replace(/[T:]/g, "-");
+    lastFocus = document.activeElement; current = { blob, fname: `phone-${stamp}.png` };
+    $("#vTitle").innerHTML = `Screenshot<small>${new Date().toLocaleTimeString()}</small>`; $("#vPrev").disabled = $("#vNext").disabled = true;
+    $("#vBody").innerHTML = `<img src="${blob}" alt="Screenshot of the phone screen">`; V.showModal();
+  } catch(err) { t.remove(); toast("Screenshot failed: " + err.message, {err:true}); }
+};
+
+/* ---------- photo backup ---------- */
+async function renderBackup(token) {
+  const r = await api("/api/backup"); if (token && S.loadToken !== token) return;
+  S.backup = r; const st = r.settings;
+  const last = r.last ? `Last backup ${fmtDate(r.last)}` : "Never backed up from this Mac";
+  const what = r.count ? `${r.photos ? `${r.photos} photo${r.photos > 1 ? "s" : ""}` : ""}${r.photos && r.videos ? " and " : ""}${r.videos ? `${r.videos} video${r.videos > 1 ? "s" : ""}` : ""}` : "Everything is backed up";
+  $("#content").innerHTML = `<div class="page">
+    <h1>Photo backup</h1><p class="lead">Copies new photos and videos to your Mac. Each run only copies what isn't there yet.</p>
+    <section class="panel" aria-labelledby="bkNow"><div class="row2"><div>
+      <div class="bignum" id="bkNow">${what}${r.count ? `<small>${fmtSize(r.bytes)} new</small>` : ""}</div><div class="muted">${last}</div></div>
+      <button class="btn primary" type="button" id="bkRun" ${r.count ? "" : "disabled"}>Back up now</button></div></section>
+    <section class="panel" aria-labelledby="bkSrc"><h2 id="bkSrc">What to back up</h2><div class="srcs">
+      ${r.sources.map(s => `<label class="${s.path ? "" : "off"}"><input type="checkbox" data-src="${esc(s.label)}" ${s.on ? "checked" : ""} ${s.path ? "" : "disabled"}><span>${esc(s.label)}<small>${s.path ? esc(s.path) : "Not on this phone"}</small></span></label>`).join("")}
+    </div></section>
+    <section class="panel" aria-labelledby="bkDest"><h2 id="bkDest">Where to save</h2>
+      <div class="pathbox"><code title="${esc(st.dest)}">${esc(st.dest.replace(/^\/(Users|home)\/[^/]+/, "~"))}</code><button class="btn" type="button" id="bkPick">Choose…</button><button class="btn" type="button" id="bkShow">Show in Finder</button></div>
+      <label class="toggle"><input type="checkbox" id="bkHeic" ${st.heic ? "checked" : ""}><span><b>Convert HEIC photos to JPG</b><small>Easier to open everywhere. Uses the converter built into macOS.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="bkAuto" ${st.auto ? "checked" : ""}><span><b>Back up automatically when this phone connects</b><small>Works while Cellar is running, by cable or Wi-Fi. You'll get a notification when it's done.</small></span></label>
+    </section></div>`;
+  const save = async patch => { const cur = S.backup.settings;
+    const body = Object.assign({sources: [...document.querySelectorAll("[data-src]:checked")].map(x => x.dataset.src), dest: cur.dest, heic: $("#bkHeic").checked, auto: $("#bkAuto").checked}, patch);
+    try { await postJSON("/api/backup/settings", body); renderBackup(); } catch(e) { toast(e.message, {err:true}); } };
+  document.querySelectorAll("[data-src]").forEach(x => x.onchange = () => save({}));
+  $("#bkHeic").onchange = () => save({}); $("#bkAuto").onchange = () => save({});
+  $("#bkPick").onclick = async () => { try { const p = await api("/api/pickfolder", {}, {method:"POST"}); if (p.path) save({dest: p.path}); } catch(e) { toast(e.message, {err:true}); } };
+  $("#bkShow").onclick = () => api("/api/reveal", {path: st.dest}, {method:"POST"}).catch(() => toast("That folder doesn't exist yet. It's created on the first backup."));
+  $("#bkRun").onclick = async () => { $("#bkRun").disabled = true;
+    try { const j = await api("/api/backup/run", {}, {method:"POST"}); if (j.nothing) return renderBackup();
+      trackJob(j, jj => { if (S.mode === "backup") renderBackup(); if (jj.state === "done") toast(`Backed up ${jj.items_done - jj.errors.length} items`, {action: ["Show in Finder", () => api("/api/reveal", {path: jj.result.dest}, {method:"POST"})]}); }); }
+    catch(e) { toast(e.message, {err:true}); $("#bkRun").disabled = false; } };
+}
+
+/* ---------- apps ---------- */
+async function renderApps(token) {
+  const r = await api("/api/apps"); if (token && S.loadToken !== token) return;
+  $("#content").innerHTML = `<div class="page">
+    <div class="row2"><div><h1>Apps</h1><p class="muted">Apps you installed on the phone. Drop an .apk file here to install it.</p></div>
+      <button class="btn primary" type="button" id="apkBtn">Install app…</button><input type="file" id="apkInput" accept=".apk" multiple hidden></div>
+    ${r.apps.length ? `<table><colgroup><col><col style="width:32%"><col style="width:90px"><col style="width:90px"><col style="width:190px"></colgroup>
+    <thead><tr><th>Name</th><th>App ID</th><th class="num">Version</th><th class="num">Size</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
+    ${r.apps.map(a => `<tr><td><span class="name" style="cursor:default"><span class="ico">${svg("apk")}</span><span>${esc(a.name)}</span></span></td><td class="where">${esc(a.pkg)}</td><td class="num">${esc(a.version || "—")}</td><td class="num">${a.size ? fmtSize(a.size) : "—"}</td>
+      <td class="act" style="opacity:1"><button class="btn" type="button" data-appsave="${esc(a.pkg)}">Save to Mac</button><button class="btn quiet" type="button" data-appdel="${esc(a.pkg)}" data-name="${esc(a.name)}">Uninstall</button></td></tr>`).join("")}
+    </tbody></table>` : stateHTML("apk", "No apps installed", "Only apps you installed yourself are listed here.")}</div>`;
+  $("#apkBtn").onclick = () => $("#apkInput").click();
+  $("#apkInput").onchange = e => { installFiles([...e.target.files]); e.target.value = ""; };
+  $("#content").querySelectorAll("[data-appsave]").forEach(b => b.onclick = async () => {
+    try { const j = await api("/api/apps/backup", {pkg: b.dataset.appsave}, {method:"POST"}); trackJob(j, jj => { if (jj.state === "done") toast(`Saved to Downloads/Cellar/Apps`, {action: ["Show in Finder", () => api("/api/reveal", {path: jj.result.saved[0]}, {method:"POST"})]}); }); }
+    catch(e) { toast(e.message, {err:true}); } });
+  $("#content").querySelectorAll("[data-appdel]").forEach(b => b.onclick = async () => {
+    if (!await confirmDialog(`Uninstall ${b.dataset.name}?`, "The app and its data are removed from the phone. Save the app to your Mac first if you might want it back.", "Uninstall", true)) return;
+    try { await api("/api/apps/uninstall", {pkg: b.dataset.appdel}, {method:"POST"}); toast(`Uninstalled ${b.dataset.name}`); renderApps(); } catch(e) { toast(e.message, {err:true}); } });
+}
+async function installFiles(files) {
+  files = files.filter(f => /\.apk$/i.test(f.name)); if (!files.length) return toast("Choose an .apk file to install.", {err:true});
+  const stageId = rand();
+  try { await stageFiles(stageId, files.map(f => ({file: f, rel: f.name})), `Preparing ${files.length === 1 ? files[0].name : files.length + " apps"}`);
+    const j = await postJob({kind:"install", stage: stageId, title: files.length === 1 ? `Install ${files[0].name}` : `Install ${files.length} apps`});
+    trackJob(j, jj => { if (jj.state === "done" && !jj.errors.length) toast(files.length === 1 ? `Installed ${files[0].name}` : `Installed ${files.length} apps`); else if (jj.errors.length) toast(`Install failed: ${jj.errors[0][1]}`, {err:true}); if (S.mode === "apps") renderApps(); }); }
+  catch(e) { if (e.message !== "cancelled") toast(e.message, {err:true}); }
+}
+
+/* ---------- mirroring (scrcpy) ---------- */
+const MR = $("#mirror");
+$("#mirrorBtn").onclick = () => { if (!S.serial) return toast("Connect a phone first", {err:true}); renderMirror(); MR.showModal(); };
+$("#mrClose").onclick = () => MR.close();
+async function renderMirror(msg) {
+  let tools = {}; try { tools = await api("/api/tools"); } catch(e) {}
+  const b = $("#mrBody");
+  if (!tools.scrcpy) {
+    b.innerHTML = `<p>Screen mirroring uses <b>scrcpy</b>, a free open-source tool. Cellar can download it for you, about 10 MB, one time.</p>
+      <div class="cbtns"><button class="btn primary" type="button" id="mrInstall">Download scrcpy</button><span class="muted" style="font-size:12.5px">or in Terminal: <code>brew install scrcpy</code></span></div>${msg ? `<p class="wstatus err"><span class="dot"></span><span>${esc(msg)}</span></p>` : ""}`;
+    $("#mrInstall").onclick = async () => { $("#mrInstall").disabled = true; $("#mrInstall").textContent = "Downloading…";
+      try { await api("/api/tools/install", {tool:"scrcpy"}, {method:"POST"}); renderMirror(); } catch(e) { renderMirror(e.message); } };
+    return;
+  }
+  b.innerHTML = `<p class="muted">Shows the phone's screen in a window on your Mac. Use your mouse and keyboard to control it. Phone sound plays on the Mac (Android 11+).</p>
+    <label class="toggle"><input type="checkbox" id="mrOff"><span><b>Turn the phone's screen off</b><small>Keeps mirroring while saving battery and privacy.</small></span></label>
+    <label class="toggle"><input type="checkbox" id="mrRec"><span><b>Record to a video on your Mac</b><small>Saved in Downloads/Cellar when you close the window.</small></span></label>
+    <label class="toggle"><input type="checkbox" id="mrKbd"><span><b>Use the Mac keyboard as a real keyboard</b><small>Better for typing in any app, including games and non-English layouts.</small></span></label>
+    <label class="toggle"><input type="checkbox" id="mrMute"><span><b>No sound</b><small>Keep the phone's audio on the phone.</small></span></label>
+    <div class="cbtns"><span class="grow"></span><button class="btn primary" type="button" id="mrStart">Start mirroring</button></div>`;
+  $("#mrStart").onclick = async () => {
+    try { await postJSON("/api/mirror", {screen_off: $("#mrOff").checked, record: $("#mrRec").checked, keyboard: $("#mrKbd").checked ? "uhid" : "", no_audio: $("#mrMute").checked});
+      MR.close(); toast("Mirroring started. It opens in its own window."); }
+    catch(e) { if (e.message === "need_scrcpy") renderMirror(); else toast(e.message, {err:true}); } };
+}
+
+/* ---------- Finder + settings ---------- */
+async function showInFinder() {
+  const t = toast("Connecting the phone to Finder…", {ms: 60000});
+  try { const r = await api("/api/finder/mount", {}, {method:"POST"}); t.remove();
+    if (r.mounted) toast("Your phone is in Finder under Locations. Copy, paste and drag work there too.", {ms: 8000});
+    else toast(r.note ? `${r.note}. Address: ${r.url}` : "Finder didn't confirm the connection. Try Go › Connect to Server with " + r.url, {ms: 12000}); }
+  catch(e) { t.remove(); toast(e.message, {err:true}); }
+}
+const ST = $("#settings");
+$("#settingsBtn").onclick = async () => { try { const s = await api("/api/settings"); $("#stFinder").checked = s.finder_auto; $("#stNotify").checked = s.notifications; } catch(e) {} ST.showModal(); };
+$("#stClose").onclick = () => ST.close();
+["stFinder", "stNotify"].forEach(id => $("#" + id).onchange = () => postJSON("/api/settings", {finder_auto: $("#stFinder").checked, notifications: $("#stNotify").checked}).catch(e => toast(e.message, {err:true})));
+
+/* ---------- upload: Mac → phone through the transfer queue ---------- */
+const JUNK = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
+const rand = () => [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, "0")).join("");
+async function collectDropped(entries) {
+  const files = [], dirs = [];
+  const read = r => new Promise((ok, no) => r.readEntries(ok, no));
+  async function walk(entry, prefix) {
+    if (entry.isFile) { const f = await new Promise((ok, no) => entry.file(ok, no)); files.push({file:f, rel:prefix + entry.name}); }
+    else if (entry.isDirectory) { dirs.push(prefix + entry.name); const r = entry.createReader(); let batch;
+      do { batch = await read(r); for (const e of batch) await walk(e, prefix + entry.name + "/"); } while (batch.length); }
+  }
+  for (const e of entries) await walk(e, "");
+  return { files, dirs };
+}
+// Sends files to Cellar's staging area with real byte progress (XHR), shown in the Transfers panel.
+function stageFiles(stageId, files, title, dirs = []) {
+  const total = files.reduce((a, x) => a + x.file.size, 0);
+  const lj = {id: "local-" + stageId, title, state: "running", total, done: 0, items_total: files.length, items_done: 0, current: "", speed: 0, errors: [], aborted: false, xhr: null};
+  lj.abort = () => { lj.aborted = true; if (lj.xhr) lj.xhr.abort(); };
+  S.localJobs.unshift(lj); pollJobs(true);
+  const t0 = Date.now();
+  const one = x => new Promise((ok, no) => {
+    const xhr = new XMLHttpRequest(); lj.xhr = xhr;
+    xhr.open("POST", "/api/stage?" + new URLSearchParams({id: stageId, rel: x.rel, mtime: x.file.lastModified || "", t: T}));
+    xhr.setRequestHeader("X-Token", T);
+    const base = lj.done;
+    xhr.upload.onprogress = ev => { lj.done = base + ev.loaded; lj.speed = lj.done / Math.max(0.3, (Date.now() - t0) / 1000); };
+    xhr.onload = () => xhr.status === 200 ? ok() : no(new Error((JSON.parse(xhr.responseText || "{}").error) || "Upload failed"));
+    xhr.onerror = () => no(new Error("Couldn't read “" + x.rel + "” on your Mac. If it's in iCloud, download it first."));
+    xhr.onabort = () => no(new Error("cancelled"));
+    xhr.send(x.file);
+  });
+  return (async () => {
+    try {
+      for (const d of dirs) await fetch("/api/stage/mkdir?" + new URLSearchParams({id: stageId, rel: d}), {method: "POST", headers: {"X-Token": T}});
+      for (const x of files) { if (lj.aborted) throw new Error("cancelled"); lj.current = x.rel; await one(x); lj.items_done++; lj.done = files.slice(0, lj.items_done).reduce((a, y) => a + y.file.size, 0); }
+    } finally { S.localJobs = S.localJobs.filter(x => x !== lj); renderTransfers(); }
+  })();
+}
+async function upload({files, dirs = []}, destDir) {
+  files = files.filter(x => !JUNK.has(x.rel.split("/").pop()));
+  if (!S.serial || (!files.length && !dirs.length)) return;
+  const dir = destDir || S.path;
+  if (!destDir && S.mode !== "folder") return toast("Open a folder first, then add files.", {err:true});
+  // top-level items (a dropped folder is one item), with what we know about them for the conflict dialog
+  const roots = new Map();
+  files.forEach(x => { const top = x.rel.split("/")[0], isDir = x.rel.includes("/");
+    const r = roots.get(top) || {name: top, dir: isDir, size: 0, mtime: 0}; r.size += x.file.size; r.mtime = Math.max(r.mtime, Math.floor((x.file.lastModified || 0) / 1000)); roots.set(top, r); });
+  dirs.forEach(d => { const top = d.split("/")[0]; if (!roots.has(top)) roots.set(top, {name: top, dir: true, size: 0, mtime: 0}); });
+  try {
+    const ex = (await postJSON("/api/check", {side:"phone", dir, names:[...roots.keys()]})).existing;
+    const pol = await resolveConflicts([...roots.values()], ex, placeLabel(dir)); if (!pol) return;
+    const keepFiles = files.filter(x => pol.has(x.rel.split("/")[0])), keepDirs = dirs.filter(d => pol.has(d.split("/")[0]));
+    if (!keepFiles.length && !keepDirs.length) return;
+    const stageId = rand(), n = pol.size;
+    const title = n === 1 ? `Copy “${[...pol.keys()][0]}” to ${placeLabel(dir)}` : `Copy ${n} items to ${placeLabel(dir)}`;
+    await stageFiles(stageId, keepFiles, title, keepDirs);
+    const job = await postJob({kind:"push", stage: stageId, dir, title, roots: [...pol].map(([name, policy]) => ({name, policy}))});
+    trackJob(job, j => { if (S.mode === "folder" && S.path === dir) refresh();
+      if (j.state === "done" && !j.errors.length) toast(`Copied ${n === 1 ? `“${[...pol.keys()][0]}”` : n + " items"} to ${placeLabel(dir)}`);
+      else if (j.errors.length) toast(`${j.errors.length} item${j.errors.length > 1 ? "s" : ""} failed: ${j.errors[0][1]}`, {err:true}); });
+  } catch(e) { if (e.message !== "cancelled") toast(e.message, {err:true}); }
+}
+const fromInput = list => ({ files: [...list].map(f => ({file:f, rel:f.webkitRelativePath || f.name})) });
+$("#fileInput").onchange = e => { (S.mode === "apps" ? installFiles([...e.target.files]) : upload(fromInput(e.target.files))); e.target.value = ""; };
+$("#folderInput").onchange = e => { upload(fromInput(e.target.files)); e.target.value = ""; };
+let dragN = 0; const main = document.querySelector("main");
+const externalDrag = e => e.dataTransfer.types.includes("Files") && !e.dataTransfer.types.includes(DV_TYPE);
+main.addEventListener("dragenter", e => { if (externalDrag(e) && S.serial && (S.mode === "folder" || S.mode === "apps")) { dragN++; $("#drop").textContent = S.mode === "apps" ? "Drop .apk files to install them" : `Drop files or folders to copy them to ${placeLabel(S.path)}`; $("#drop").classList.add("on"); } });
+main.addEventListener("dragleave", () => { if (--dragN <= 0) { dragN = 0; $("#drop").classList.remove("on"); } });
+main.addEventListener("dragover", e => e.preventDefault());
+main.addEventListener("drop", async e => {
+  e.preventDefault(); dragN = 0; $("#drop").classList.remove("on"); if (!S.serial || !externalDrag(e)) return;
+  const target = dropTargetOf(e), destDir = target ? target.dataset.drop : null;
+  // Must grab entries synchronously, before any await, or the browser discards them.
+  const entries = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry ? i.webkitGetAsEntry() : null).filter(Boolean);
+  const plain = [...e.dataTransfer.files];
+  if (S.mode === "apps") return installFiles(plain);
+  if (!entries.length) return upload(fromInput(plain), destDir);
+  try { upload(await collectDropped(entries), destDir); }
+  catch(err) { toast("Couldn't read that folder on your Mac: " + err.message, {err:true}); }
+});
+// Sidebar places accept drops from Finder too
+document.querySelector("aside").addEventListener("drop", async e => {
+  const t = dropTargetOf(e); if (!t || !externalDrag(e)) return; e.preventDefault();
+  const entries = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry ? i.webkitGetAsEntry() : null).filter(Boolean);
+  upload(entries.length ? await collectDropped(entries) : fromInput(e.dataTransfer.files), t.dataset.drop);
+});
+
+/* ---------- clipboard: ⌘C / ⌘X / ⌘V, and paste from Finder ---------- */
+const CLIP_MARK = "cellar-clipboard";
+const typingNow = () => document.activeElement && document.activeElement.matches("input:not([type=checkbox]),select,textarea");
+const dialogOpen = () => [...document.querySelectorAll("dialog")].some(d => d.open);
+const filesMode = () => ["folder", "search", "recent"].includes(S.mode);
+["copy", "cut"].forEach(type => document.addEventListener(type, e => {
+  if (typingNow() || dialogOpen() || !filesMode()) return;
+  const list = targets(); if (!list.length) return;
+  e.preventDefault(); e.clipboardData.setData("text/plain", CLIP_MARK + "\n" + list.map(ep).join("\n"));
+  setClip(list, type);
+}));
+let altPaste = 0;
+document.addEventListener("paste", e => {
+  if (typingNow() || dialogOpen()) return;
+  const files = [...(e.clipboardData.files || [])], text = e.clipboardData.getData("text/plain") || "";
+  e.preventDefault();
+  const force = Date.now() - altPaste < 600; altPaste = 0;
+  if (files.length && !text.startsWith(CLIP_MARK)) { if (S.mode !== "folder") return toast("Open a folder first, then paste.", {err:true}); return upload(fromInput(files)); }
+  if (S.clip) return pasteClip(force);
+  if (text && !text.startsWith(CLIP_MARK)) toast("Nothing to paste. Copy files in Cellar or Finder first.");
+});
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown", e => {
+  if (!MENU.hidden) return;
+  if (dialogOpen()) { if (V.open && e.key === " ") { e.preventDefault(); V.close(); } return; }
+  const typing = typingNow(), cmd = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+  if (typing) { if (e.key === "Escape" && document.activeElement.id === "filter") {} return; }
+  const t = () => targets();
+  if ((cmd && k === "f") || e.key === "/") { e.preventDefault(); $("#filter").focus(); $("#filter").select(); }
+  else if (cmd && e.key === "ArrowUp") { e.preventDefault(); goUp(); }
+  else if (e.key === "Backspace" && !cmd) { e.preventDefault(); goUp(); }
+  else if (cmd && (e.key === "ArrowDown" || k === "o")) { e.preventDefault(); const x = t(); if (x.length === 1) open(x[0]); }
+  else if (cmd && k === "a" && S.visible && S.visible.length && filesMode() || cmd && k === "a" && S.mode === "trash") { e.preventDefault(); selectAll(); }
+  else if (cmd && e.altKey && e.code === "KeyV") { e.preventDefault(); altPaste = Date.now(); setTimeout(() => { if (altPaste) { altPaste = 0; pasteClip(true); } }, 120); }
+  else if (cmd && e.key === "Backspace") { e.preventDefault(); S.mode === "trash" ? deleteForever(t()) : filesMode() && trashEntries(t()); }
+  else if (cmd && k === "z" && !e.shiftKey) { e.preventDefault(); undoLast(); }
+  else if (cmd && k === "d" && filesMode()) { e.preventDefault(); duplicate(t()); }
+  else if (cmd && k === "s") { e.preventDefault(); if (filesMode() || S.mode === "trash") saveEntries(t()); }
+  else if (cmd && e.altKey && e.code === "KeyN") { e.preventDefault(); newFolder(); }
+  else if (e.key === "F2" || (e.key === "Enter" && !cmd && S.sel.size === 1 && filesMode())) { const x = t(); if (x.length === 1 && filesMode()) { e.preventDefault(); startRename(x[0]); } }
+  else if (e.key === " " && filesMode()) { const x = t(); if (x.length && !x[0].dir && previewable(x[0])) { e.preventDefault(); preview(x[0]); } }
+  else if ((e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) && (filesMode() || S.mode === "trash")) {
+    e.preventDefault(); const x = t(), f = document.activeElement, r = f.getBoundingClientRect();
+    if (x.length) openMenu(entryMenu(x), r.left + 30, r.bottom, f); else if (S.mode === "folder") openMenu(folderMenu(), r.left + 30, r.top + 30, f); }
+  else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && S.visible && S.visible.length && (filesMode() || S.mode === "trash")) {
+    const cur = focusedEntry(), i = cur ? S.visible.indexOf(cur) : -1, n = Math.max(0, Math.min(S.visible.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)));
+    e.preventDefault(); focusEntry(ep(S.visible[n]));
+    if (e.shiftKey) { if (anchor == null) anchor = Math.max(0, i); S.sel.clear(); const [a, b] = [Math.min(anchor, n), Math.max(anchor, n)]; for (let q = a; q <= b; q++) S.sel.add(ep(S.visible[q])); syncSel(); } }
+  else if (e.key === "Escape") { if (S.sel.size) clearSel(); else if (S.clip) { S.clip = null; renderHint(); render(); } }
+});
+
+/* ---------- init ---------- */
+renderPlaces(); renderDevice(null); renderCrumbs();
+$("#content").innerHTML = '<div class="spinner" role="progressbar" aria-label="Loading"></div>';
+pollDevices(); pollJobs();
+</script>
+</body>
+</html>
