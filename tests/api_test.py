@@ -143,3 +143,20 @@ r=call("/api/export","POST",{"what":["calendar","calls"]}); os.remove(os.path.di
 ok("won't let Cellar read your calendar" in r["results"]["calendar"].get("error","") and "error" not in r["results"]["calls"], "a refused provider is explained and doesn't stop the others")
 r=call("/api/export","POST",{"what":[]}); ok("Choose" in r.get("error",""), "nothing chosen is refused")
 rows=cm.parse_rows("Row: 0 a=1, b=hello, world, c=x\nline2\nRow: 1 a=2, b=NULL, c=y\n",["a","b","c"]); ok(rows==[{"a":"1","b":"hello, world","c":"x\nline2"},{"a":"2","b":"","c":"y"}], f"parse_rows handles commas, line breaks, NULL {rows}")
+# --- step 5: text messages
+FB=os.path.dirname(os.path.abspath(__file__))+"/fakebin"
+ok(call("/api/sms/check")["ok"], "sms readable on the fake phone")
+t=call("/api/sms/threads"); ok(t["total"]==3 and len(t["threads"])==2 and t["threads"][0]["name"] in ("Bo Zhang",) and {x["name"] for x in t["threads"]}=={"Ada Lovelace","Bo Zhang"}, f"threads with contact names {[(x['name'],x['count']) for x in t['threads']]}")
+r=call("/api/sms/export","POST",{"format":"csv","threads":None}); MD=XD+"/Messages"
+rows=list(csv.reader(open(MD+"/messages.csv",encoding="utf-8-sig",newline="")))
+ok(len(rows)==4 and rows[0][2]=="Direction" and rows[1][2]=="Received" and rows[2][2]=="Sent" and 'red' in rows[2][5] and "\n" in rows[2][5], f"messages.csv keeps quotes and line breaks in one cell: {rows[2][5]!r}")
+ada=[x["key"] for x in t["threads"] if x["name"]=="Ada Lovelace"]
+r=call("/api/sms/export","POST",{"format":"csv","threads":ada}); rows=list(csv.reader(open(MD+"/messages 2.csv",encoding="utf-8-sig",newline=""))); ok(len(rows)==3, "export only the chosen conversation, never overwrite")
+r=call("/api/sms/export","POST",{"format":"pdf","threads":None}); ok(r["files"]==["messages.pdf"] and open(MD+"/messages.pdf","rb").read(5)==b"%PDF-" and not os.path.exists(MD+"/messages.html"), f"pdf made from html {r['files']} {r.get('note')}")
+cm_html=cm.sms_html([{"when":1730000000000,"number":"+4420","key":"4420","name":"Ada Lovelace","dir":"in","body":"say \"red\" <b>","kind":"SMS"}],"T"); ok("Ada Lovelace" in cm_html and "&quot;red&quot;" in cm_html and "<b>" not in cm_html.split("</style>")[1], "pdf html groups by name and escapes text")
+cm.find_pdf_browser=lambda: None; ok(cm.html_to_pdf("/nonexistent.html","/tmp/x.pdf") is False, "no browser and no cupsfilter: falls back instead of crashing")
+
+r=call("/api/sms/export","POST",{"format":"csv","threads":[]}); ok("no messages" in r.get("error","").lower(), "empty selection refused")
+open(FB+"/sms_denied","w").close()
+c=call("/api/sms/check"); r=call("/api/sms/threads"); os.remove(FB+"/sms_denied")
+ok(c["ok"] is False and "doesn't let Cellar read text messages" in c["reason"] and "error" in r, f"refused SMS is detected and explained: {c.get('reason','')[:60]}")

@@ -1416,6 +1416,177 @@ def run_exports(serial, what):
     return {"folder": folder, "results": results}
 
 
+# ---------------------------------------------------------------- text messages → CSV or PDF
+
+_msg_cache = {}
+SMS_BOX = {"1": "in", "2": "out", "3": "draft", "4": "out", "5": "out", "6": "out"}
+
+
+def sms_check(serial):
+    """Can the computer read texts at all? Some phones refuse. Returns {ok, reason}."""
+    try:
+        content_query(serial, "content://sms", ["_id"], where="_id=-1", what="your text messages")
+        return {"ok": True}
+    except AdbError as e:
+        return {"ok": False, "reason": str(e).replace("This phone won't let Cellar read your text messages.",
+                "This phone doesn't let Cellar read text messages.") + " Your phone's own messaging app may offer a backup or export instead."}
+
+
+def norm_number(n):
+    d = re.sub(r"\D", "", n or "")
+    return d[-9:] if len(d) >= 7 else (n or "").strip().lower()
+
+
+def contact_names(serial):
+    try:
+        rows = content_query(serial, "content://com.android.contacts/data", ["display_name", "mimetype", "data1"], what="your contacts")
+    except AdbError:
+        return {}
+    return {norm_number(r["data1"]): r["display_name"] for r in rows if r["mimetype"].endswith("phone_v2") and r["data1"]}
+
+
+def fetch_messages(serial, fresh=False):
+    c = _msg_cache.get(serial)
+    if c and not fresh and time.time() - c["at"] < 300:
+        return c
+    rows = content_query(serial, "content://sms", ["_id", "address", "date", "type", "body", "thread_id"], sort="date ASC", what="your text messages")
+    names = contact_names(serial)
+    msgs = [{"when": int(r["date"] or 0), "number": r["address"], "dir": SMS_BOX.get(r["type"], "in"), "body": r["body"], "kind": "SMS"}
+            for r in rows if r["date"].isdigit()]
+    note = ""
+    try:  # picture messages: keep their text parts; the pictures themselves are not exported
+        mms = content_query(serial, "content://mms", ["_id", "date", "msg_box"], what="picture messages")
+        if mms:
+            parts = {}
+            for p in content_query(serial, "content://mms/part", ["mid", "text"], where="ct='text/plain'", what="picture messages"):
+                parts.setdefault(p["mid"], []).append(p["text"])
+            addrs = {}
+            for a in content_query(serial, "content://mms/addr", ["msg_id", "address", "type"], what="picture messages"):
+                addrs.setdefault(a["msg_id"], {})[a["type"]] = a["address"]
+            for m in mms:
+                box = SMS_BOX.get(m["msg_box"], "in")
+                a = addrs.get(m["_id"], {})
+                number = a.get("137" if box == "in" else "151") or next(iter(a.values()), "")
+                text = "\n".join(parts.get(m["_id"], [])) or "(picture or other attachment)"
+                if m["date"].isdigit():
+                    msgs.append({"when": int(m["date"]) * 1000, "number": number, "dir": box, "body": text, "kind": "MMS"})
+            note = "Pictures and attachments in picture messages aren't included, only their text."
+    except AdbError:
+        note = "Picture messages couldn't be read, so only text messages are included."
+    msgs.sort(key=lambda m: m["when"])
+    for m in msgs:
+        m["key"] = norm_number(m["number"])
+        m["name"] = names.get(m["key"], "")
+    _msg_cache[serial] = c = {"at": time.time(), "msgs": msgs, "note": note}
+    return c
+
+
+def sms_threads(serial):
+    c = fetch_messages(serial, fresh=True)
+    th = {}
+    for m in c["msgs"]:
+        t = th.setdefault(m["key"], {"key": m["key"], "name": m["name"], "number": m["number"], "count": 0, "last": 0})
+        t["count"] += 1
+        t["last"] = max(t["last"], m["when"])
+    return {"threads": sorted(th.values(), key=lambda t: -t["last"]), "total": len(c["msgs"]), "note": c["note"]}
+
+
+def fmt_when(ms):
+    return datetime.datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M")
+
+
+def sms_html(msgs, title):
+    from html import escape
+    by = {}
+    for m in msgs:
+        by.setdefault(m["key"], []).append(m)
+    out = ["<!doctype html><meta charset=utf-8><title>%s</title><style>" % escape(title),
+           "body{font:13px/1.45 -apple-system,Helvetica,Arial,sans-serif;color:#18181b;margin:0 auto;max-width:640px;padding:24px}",
+           "h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:26px 0 8px;padding-bottom:4px;border-bottom:1px solid #d4d4d8;break-after:avoid}",
+           ".sub{color:#52525b;margin:0 0 12px}.day{text-align:center;color:#52525b;font-size:11px;margin:12px 0 4px;break-after:avoid}",
+           ".m{max-width:75%;margin:4px 0;padding:7px 11px;border-radius:14px;white-space:pre-wrap;word-break:break-word;break-inside:avoid;border:1px solid #d4d4d8}",
+           ".in{background:#f4f4f5;margin-right:auto}.out{background:#e4e4e7;margin-left:auto;text-align:left}",
+           ".t{display:block;color:#52525b;font-size:10.5px;margin-top:2px}</style>",
+           "<h1>%s</h1><p class=sub>%d messages · exported %s</p>" % (escape(title), len(msgs), datetime.date.today().isoformat())]
+    for key, ms in sorted(by.items(), key=lambda kv: -kv[1][-1]["when"]):
+        who = ms[0]["name"] or ms[0]["number"] or "Unknown"
+        out.append("<h2>%s%s</h2>" % (escape(who), (" · " + escape(ms[0]["number"])) if ms[0]["name"] and ms[0]["number"] else ""))
+        day = ""
+        for m in ms:
+            d = datetime.datetime.fromtimestamp(m["when"] / 1000).strftime("%A %d %B %Y")
+            if d != day:
+                out.append("<div class=day>%s</div>" % d)
+                day = d
+            out.append("<div class='m %s'>%s<span class=t>%s%s</span></div>" % (
+                "out" if m["dir"] == "out" else "in", escape(m["body"]), datetime.datetime.fromtimestamp(m["when"] / 1000).strftime("%H:%M"),
+                " · draft" if m["dir"] == "draft" else ""))
+    return "\n".join(out)
+
+
+def find_pdf_browser():
+    cands = [os.environ.get("CELLAR_CHROME", ""), "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+             "/Applications/Chromium.app/Contents/MacOS/Chromium", "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+             "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser", "/opt/pw-browsers/chromium"]
+    cands += [shutil.which(n) or "" for n in ("google-chrome", "chromium", "chromium-browser")]
+    return next((c for c in cands if c and os.access(c, os.X_OK)), None)
+
+
+def html_to_pdf(html_path, pdf_path):
+    """Chrome-family browser first (best result), then macOS cupsfilter. Returns True when a PDF was written."""
+    browser = find_pdf_browser()
+    if browser:
+        cmd = [browser, "--headless=new", "--disable-gpu", "--no-pdf-header-footer", f"--print-to-pdf={pdf_path}"]
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            cmd.append("--no-sandbox")
+        try:
+            r = subprocess.run(cmd + ["file://" + urllib.parse.quote(html_path)], capture_output=True, timeout=120)
+            if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
+                return True
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    if IS_MAC and shutil.which("cupsfilter"):
+        try:
+            r = subprocess.run(["cupsfilter", "-m", "application/pdf", html_path], capture_output=True, timeout=120)
+            if r.returncode == 0 and r.stdout.startswith(b"%PDF"):
+                with open(pdf_path, "wb") as f:
+                    f.write(r.stdout)
+                return True
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return False
+
+
+def sms_export(serial, fmt, keys):
+    c = fetch_messages(serial)
+    msgs = [m for m in c["msgs"] if keys is None or m["key"] in keys]
+    if not msgs:
+        raise AdbError("There are no messages to export.")
+    folder = os.path.join(export_dir(), "Messages")
+    os.makedirs(folder, exist_ok=True)
+    pick = lambda name: name if not os.path.exists(os.path.join(folder, name)) else keep_both_name(name, set(os.listdir(folder)))
+    files, note = [], c["note"]
+    if fmt in ("csv", "both"):
+        name = pick("messages.csv")
+        rows = [[fmt_when(m["when"]), m["name"] or m["number"], {"in": "Received", "out": "Sent", "draft": "Draft"}.get(m["dir"], m["dir"]), m["name"], m["number"], m["body"], m["kind"]] for m in msgs]
+        with open(os.path.join(folder, name), "w", encoding="utf-8", newline="") as f:
+            f.write(csv_text(["Date", "Conversation", "Direction", "Name", "Number", "Message", "Type"], rows))
+        files.append(name)
+    if fmt in ("pdf", "both"):
+        html_name = pick("messages.html")
+        html_path = os.path.join(folder, html_name)
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(sms_html(msgs, "Text messages"))
+        pdf_name = pick("messages.pdf")
+        if html_to_pdf(html_path, os.path.join(folder, pdf_name)):
+            os.remove(html_path)
+            files.append(pdf_name)
+        else:
+            files.append(html_name)
+            note = ("Cellar couldn't make a PDF here (it needs Google Chrome, Edge or Brave installed). Open the saved web page, then choose "
+                    "File › Print › Save as PDF. " + note).strip()
+    return {"folder": folder, "files": files, "count": len(msgs), "note": note}
+
+
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
@@ -2396,6 +2567,15 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             if not what:
                 raise AdbError("Choose what to export")
             self.send_json(run_exports(s, what))
+        elif R == ("GET", "/api/sms/check"):
+            self.send_json(sms_check(s))
+        elif R == ("GET", "/api/sms/threads"):
+            self.send_json(sms_threads(s))
+        elif R == ("POST", "/api/sms/export"):
+            d = self.body_json()
+            fmt = d.get("format") if d.get("format") in ("csv", "pdf", "both") else "csv"
+            keys = set(d["threads"]) if isinstance(d.get("threads"), list) else None
+            self.send_json(sms_export(s, fmt, keys))
         elif R == ("GET", "/api/volumes"):
             self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):

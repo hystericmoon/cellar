@@ -297,6 +297,8 @@ dialog.small{width:min(520px,94vw)}
 .dpwhy{font-size:12.5px;color:var(--muted);min-width:90px;text-align:right}.dupe input:checked~.dpwhy{color:var(--ok);font-weight:600}
 .group legend{font-weight:600;padding:0 6px}.group input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
 .exlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}.exlist li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius)}.exlist span{color:var(--muted);font-size:13px}.exlist .bad{border-color:var(--danger)}.exlist .bad span{color:var(--danger)}
+.smlist{list-style:none;margin:0;padding:0;max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}.smlist li{border-bottom:1px solid var(--line)}.smlist li:last-child{border:0}.smlist label{display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer}.smlist label:hover{background:var(--hover)}.smlist input{accent-color:var(--accent);width:16px;height:16px}
+.toggle input[type=radio]{accent-color:var(--accent)}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
@@ -611,12 +613,13 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
 I.check = '<path d="m5 12 5 5 9-10"/>';
 I.contact = '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>';
+I.chat = '<path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z"/>';
 I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
@@ -1696,6 +1699,37 @@ async function renderExport() {
     b.disabled = false; b.textContent = "Export"; };
 }
 PAGES.export = renderExport;
+
+/* ---------- Save text messages ---------- */
+async function renderMessages(token) {
+  const chk = await api("/api/sms/check"); if (S.loadToken !== token) return;
+  if (!chk.ok) { $("#content").innerHTML = `<div class="page"><h1>Save text messages</h1><section class="panel">${stateHTML("lock", "This phone won’t share its messages", esc(chk.reason))}</section></div>`; return; }
+  const r = await api("/api/sms/threads"); if (S.loadToken !== token) return;
+  const th = r.threads;
+  if (!th.length) { $("#content").innerHTML = `<div class="page"><h1>Save text messages</h1><section class="panel">${stateHTML("chat", "No text messages found", "Messages from apps like WhatsApp or Signal aren’t stored in the phone’s text message database, so they can’t be saved here.")}</section></div>`; return; }
+  $("#content").innerHTML = `<div class="page"><h1>Save text messages</h1>
+    <p class="lead">Makes a copy on your Mac. ${r.total.toLocaleString()} messages in ${th.length} conversation${th.length === 1 ? "" : "s"}.</p>
+    <section class="panel" aria-labelledby="smFmt"><h2 id="smFmt">Format</h2>
+      <label class="toggle"><input type="radio" name="smfmt" value="pdf" checked><span><b>PDF</b><small>Easy to read and share, grouped by conversation</small></span></label>
+      <label class="toggle"><input type="radio" name="smfmt" value="csv"><span><b>CSV spreadsheet</b><small>One row per message, opens in Numbers or Excel</small></span></label>
+      <label class="toggle"><input type="radio" name="smfmt" value="both"><span><b>Both</b></span></label></section>
+    <section class="panel" aria-labelledby="smWho"><div class="row2"><h2 id="smWho">Conversations</h2><label class="check"><input type="checkbox" id="smAll" checked>Select all</label></div>
+      <ul class="smlist">${th.map((t, i) => `<li><label><input type="checkbox" data-smkey="${esc(t.key)}" checked><span class="dpname"><b>${esc(t.name || t.number || "Unknown")}</b><small>${t.name ? esc(t.number) + " · " : ""}last message ${fmtDate(Math.floor(t.last / 1000))}</small></span><span class="muted">${t.count.toLocaleString()}</span></label></li>`).join("")}</ul>
+      ${r.note ? `<p class="note">${esc(r.note)}</p>` : ""}
+      <div class="row2"><span class="muted" id="smSel"></span><button class="btn primary" type="button" id="smGo">Save</button></div></section>
+    <div id="smResult" aria-live="polite"></div></div>`;
+  const boxes = () => [...document.querySelectorAll("[data-smkey]")];
+  const sync = () => { const on = boxes().filter(b => b.checked), n = on.reduce((a, b) => a + th.find(t => t.key === b.dataset.smkey).count, 0);
+    $("#smSel").textContent = `${on.length} conversation${on.length === 1 ? "" : "s"} · ${n.toLocaleString()} messages`; $("#smGo").disabled = !on.length; $("#smAll").checked = on.length === boxes().length; };
+  boxes().forEach(b => b.onchange = sync); $("#smAll").onchange = e => { boxes().forEach(b => b.checked = e.target.checked); sync(); }; sync();
+  $("#smGo").onclick = async () => { const b = $("#smGo"); b.disabled = true; b.textContent = "Saving…";
+    try { const x = await postJSON("/api/sms/export", {format: document.querySelector("[name=smfmt]:checked").value, threads: boxes().filter(b => b.checked).map(b => b.dataset.smkey)});
+      $("#smResult").innerHTML = `<section class="panel"><h2>Saved ${x.count.toLocaleString()} messages</h2><p class="muted" style="margin:0">${x.files.map(esc).join(", ")}</p>${x.note ? `<p class="note">${esc(x.note)}</p>` : ""}<div><button class="btn" type="button" id="smShow">Show in Finder</button></div></section>`;
+      $("#smShow").onclick = () => api("/api/reveal", {path: x.folder}, {method:"POST"}).catch(e => toast(e.message, {err:true}));
+    } catch(e) { toast(e.message, {err:true}); }
+    b.textContent = "Save"; sync(); };
+}
+PAGES.messages = renderMessages;
 
 /*__NEWPAGES__*/
 
