@@ -97,5 +97,17 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.emulateMedia({colorScheme:'dark'}); await p.click('nav button[data-path$="/Documents"]'); await p.click('[data-view=list]'); await p.waitForSelector(row('Work'));
     await p.click('#content', {button:'right', position:{x:600, y:560}}); await p.waitForSelector('#ctxmenu:not([hidden])'); await p.screenshot({path:__dirname + '/shots/u8.png'});
   });
+  await step('restyle', async () => {
+    await p.emulateMedia({colorScheme:'light'}); await p.click('[data-view=list]'); await p.waitForSelector(row('Work'));
+    const css = await p.evaluate(() => { const g = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return {text:g('--text'), muted:g('--muted'), line:g('--line'), accent:g('--accent')}; });
+    ok(css.text === '#09090b' && css.muted === '#71717a' && css.line === '#e4e4e7' && css.accent === '#18181b', 'zinc tokens in light mode');
+    await p.click(row('Work') + ' td.ck input.sel', {force:true});
+    const sel = await p.$eval(row('Work') + ' td:first-child', td => ({shadow:getComputedStyle(td).boxShadow, box:td.querySelector('input.sel').checked}));
+    ok(sel.box && sel.shadow !== 'none', 'selected row has a checkmark and a left border, not just a fill');
+    await p.keyboard.press('Escape');
+    await p.emulateMedia({colorScheme:'dark'}); await p.waitForTimeout(100);
+    ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(9, 9, 11)', 'dark mode is zinc-950');
+    await p.emulateMedia({colorScheme:'light'});
+  });
   console.log('errors:', errs); await b.close();
 })();
