@@ -301,6 +301,9 @@ dialog.small{width:min(520px,94vw)}
 .toggle input[type=radio]{accent-color:var(--accent)}
 .mediarow{display:flex;gap:8px;flex-wrap:wrap}.btn.icon.big{width:44px;height:40px}.btn.icon.big svg{width:20px;height:20px}
 .note.bad{color:var(--danger)}
+.conflicts{border:1px solid var(--warn);border-radius:var(--radius);padding:10px 12px;display:grid;gap:4px}.conflicts ul{margin:0;padding-left:18px;font-size:13px}.conflicts li{margin:2px 0}
+.pvlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}.pvlist summary{cursor:pointer;padding:4px 0}.pvlist details ul{max-height:220px;overflow:auto;margin:4px 0 8px;padding-left:22px;font-size:13px}
+.browse{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:grid;gap:8px}.browse ul{list-style:none;margin:0;padding:0;max-height:200px;overflow:auto;display:grid;gap:2px}.browse .linkbtn{text-decoration:none;display:flex;align-items:center;gap:8px;padding:4px 2px}.browse .linkbtn svg{width:16px;height:16px;color:var(--muted)}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
@@ -615,13 +618,14 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["sync","Sync folders","sync"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
 I.check = '<path d="m5 12 5 5 9-10"/>';
 I.contact = '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>';
 I.chat = '<path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z"/>';
+I.sync = '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>';
 I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
@@ -1773,6 +1777,77 @@ async function renderExtras(token) {
       try { const now = (await api("/api/extras")).dnd; document.querySelectorAll("[name=dnd]").forEach(i => i.checked = i.value === now); } catch(_) {} } });
 }
 PAGES.extras = renderExtras;
+
+/* ---------- Folder sync (two-way) ---------- */
+const SYNC = {preview: null, adding: false};
+const shortMac = p => p.replace(/^\/(Users|home)\/[^/]+/, "~");
+async function renderSync(token) {
+  const r = await api("/api/sync"); if (S.loadToken !== token) return;
+  const pairs = r.pairs;
+  $("#content").innerHTML = `<div class="page"><div class="row2"><div><h1>Sync folders</h1><p class="muted" style="margin:4px 0 0">Keeps a folder on your Mac and a folder on the phone the same, both ways. Nothing is deleted for good: replaced or removed files go to the phone’s Trash or to <code>Downloads/Cellar/Sync versions</code> on your Mac.</p></div>
+    <button class="btn primary" type="button" id="syAdd">Add folder pair</button></div>
+    <div id="syForm" hidden></div><div id="syPreview"></div>
+    ${pairs.length ? pairs.map(p => `<section class="panel" data-pair="${esc(p.id)}"><div class="row2"><div><h2>${esc(p.name)}</h2>
+      <p class="muted" style="margin:2px 0 0"><span title="${esc(p.mac)}">${esc(shortMac(p.mac))}</span> ⇄ <span title="${esc(p.phone)}">${esc(placeLabel(rootOf(p.phone)))}${esc(p.phone.slice(rootOf(p.phone).length))}</span></p></div>
+      <div class="spbar"><button class="btn primary" type="button" data-sypreview="${esc(p.id)}" ${p.busy ? "disabled" : ""}>${p.busy ? "Syncing…" : p.confirmed ? "Sync now" : "Review and sync"}</button><button class="btn quiet" type="button" data-syremove="${esc(p.id)}" data-name="${esc(p.name)}">Remove</button></div></div>
+      <p class="note">${p.last ? `Last sync ${fmtDate(p.last.at)}: ${p.last.pushed} to phone, ${p.last.pulled} to Mac${p.last.removed_mac + p.last.removed_phone ? `, ${p.last.removed_mac + p.last.removed_phone} removed` : ""}${p.last.conflicts ? `, ${p.last.conflicts} conflict${p.last.conflicts > 1 ? "s" : ""}` : ""}.` : "Not synced yet. You’ll see exactly what would change before anything happens."}</p>
+      ${p.last_error ? `<p class="note bad">${esc(p.last_error)} Run it again to retry.</p>` : ""}
+      ${(p.conflicts || []).length ? `<div class="conflicts" role="group" aria-label="Conflicts in ${esc(p.name)}"><b>Changed on both sides (${p.conflicts.length})</b><p class="note" style="margin:2px 0 6px">The newer file kept its name. The older one is saved next to it, on both the Mac and the phone, so you can choose.</p>
+        <ul>${p.conflicts.map(c => `<li><code>${esc(c.rel)}</code> → older version saved as <code>${esc(c.kept)}</code></li>`).join("")}</ul><button class="btn" type="button" data-sydismiss="${esc(p.id)}">Got it</button></div>` : ""}
+      <label class="toggle"><input type="checkbox" data-syauto="${esc(p.id)}" ${p.auto ? "checked" : ""} ${p.confirmed ? "" : "disabled"}><span><b>Sync automatically when this phone connects</b><small>${p.confirmed ? "If a sync would remove lots of files, Cellar pauses and asks you first." : "Available after the first sync."}</small></span></label></section>`).join("") : `<section class="panel">${stateHTML("sync", "No folders paired yet", "Pair a folder on your Mac with one on the phone, for example Documents, to keep them the same.")}</section>`}</div>`;
+  $("#syAdd").onclick = () => showSyncForm();
+  document.querySelectorAll("[data-sypreview]").forEach(b => b.onclick = () => showSyncPreview(b.dataset.sypreview));
+  document.querySelectorAll("[data-syauto]").forEach(b => b.onchange = () => postJSON("/api/sync/pairs/update", {id: b.dataset.syauto, auto: b.checked}).catch(e => { toast(e.message, {err:true}); b.checked = !b.checked; }));
+  document.querySelectorAll("[data-sydismiss]").forEach(b => b.onclick = async () => { await postJSON("/api/sync/pairs/update", {id: b.dataset.sydismiss, dismiss_conflicts: true}); renderSync(S.loadToken); });
+  document.querySelectorAll("[data-syremove]").forEach(b => b.onclick = async () => {
+    if (!await confirmDialog(`Stop syncing “${b.dataset.name}”?`, "Both folders and everything in them stay exactly as they are. Cellar just stops keeping them the same.", "Stop syncing")) return;
+    try { await postJSON("/api/sync/pairs/delete", {id: b.dataset.syremove}); renderSync(S.loadToken); } catch(e) { toast(e.message, {err:true}); } });
+}
+function showSyncForm() {
+  const f = $("#syForm"); f.hidden = false;
+  f.innerHTML = `<section class="panel" aria-labelledby="syNew"><h2 id="syNew">New folder pair</h2>
+    <label class="field">Folder on your Mac<span class="pathbox"><input id="syMac" placeholder="~/Documents/Notes" autocomplete="off"><button class="btn" type="button" id="syMacPick">Choose…</button></span></label>
+    <label class="field">Folder on the phone<span class="pathbox"><input id="syPhone" placeholder="${esc(HOME)}/Documents/Notes" autocomplete="off" value="${esc(HOME)}/"><button class="btn" type="button" id="syPhonePick">Browse…</button></span></label>
+    <div id="syBrowse" hidden></div>
+    <div class="cbtns"><span class="grow"></span><button class="btn" type="button" id="syCancel">Cancel</button><button class="btn primary" type="button" id="syCreate">Next: see what would change</button></div></section>`;
+  $("#syCancel").onclick = () => { f.hidden = true; f.innerHTML = ""; };
+  $("#syMacPick").onclick = async () => { try { const r = await api("/api/pickfolder", {prompt:"Choose the folder on your Mac to sync"}, {method:"POST"}); if (r.path) $("#syMac").value = r.path; } catch(e) { toast(e.message, {err:true}); } };
+  $("#syPhonePick").onclick = () => browsePhone($("#syPhone").value.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || HOME);
+  $("#syCreate").onclick = async () => { const b = $("#syCreate"); b.disabled = true;
+    try { const p = await postJSON("/api/sync/pairs", {mac: $("#syMac").value.trim(), phone: $("#syPhone").value.trim().replace(/\/+$/, "")}); f.hidden = true; await renderSync(S.loadToken); showSyncPreview(p.id); }
+    catch(e) { toast(e.message, {err:true}); b.disabled = false; } };
+  $("#syMac").focus();
+}
+async function browsePhone(path) {
+  const box = $("#syBrowse"); box.hidden = false;
+  try { const r = await api("/api/ls", {path}); const dirs = r.entries.filter(e => e.dir && !e.name.startsWith("."));
+    box.innerHTML = `<div class="browse"><div class="row2"><b>${esc(path)}</b><span class="spbar">${path !== rootOf(path) ? `<button class="btn" type="button" data-bup>Up</button>` : ""}<button class="btn primary" type="button" data-bpick ${path === rootOf(path) ? "disabled" : ""}>Use this folder</button></span></div>
+      <ul>${dirs.map(d => `<li><button type="button" class="linkbtn" data-bgo="${esc(join(path, d.name))}">${svg("folder")} ${esc(d.name)}</button></li>`).join("") || `<li class="muted">No folders in here</li>`}</ul></div>`;
+    box.querySelectorAll("[data-bgo]").forEach(b => b.onclick = () => browsePhone(b.dataset.bgo));
+    const up = box.querySelector("[data-bup]"); if (up) up.onclick = () => browsePhone(parentOf(path));
+    box.querySelector("[data-bpick]").onclick = () => { $("#syPhone").value = path; box.hidden = true; };
+  } catch(e) { box.innerHTML = `<p class="note bad">${esc(e.message)}</p>`; }
+}
+const SY_OPS = [["push","Copy to the phone"],["pull","Copy to your Mac"],["conflict","Changed on both sides: keep both"],["rm_phone","Remove from the phone (goes to its Trash)"],["rm_mac","Remove from your Mac (goes to Sync versions)"]];
+async function showSyncPreview(id) {
+  const box = $("#syPreview"); box.innerHTML = `<section class="panel"><div class="spinner" style="margin:6px auto"></div><p class="muted" style="text-align:center;margin:0">Comparing the two folders…</p></section>`; box.scrollIntoView({block:"nearest"});
+  try { const r = await api("/api/sync/preview", {id}); const n = Object.values(r.counts).reduce((a, b) => a + b, 0), first = !r.pair.confirmed;
+    box.innerHTML = `<section class="panel" aria-labelledby="syPv"><h2 id="syPv">${first ? "First sync: here’s what would happen" : "Changes to sync"} for “${esc(r.pair.name)}”</h2>
+      ${first ? `<p class="note">Nothing has been copied or changed yet. Check the list, then choose Sync.</p>` : ""}
+      ${n ? `<ul class="pvlist">${SY_OPS.filter(([op]) => r.counts[op]).map(([op, label]) => `<li><details><summary><b>${r.counts[op]}</b> ${label}</summary><ul>${r.items.filter(i => i.op === op).map(i => `<li><code>${esc(i.rel)}</code>${i.op === "conflict" ? ` <small>(${i.winner === "mac" ? "Mac" : "phone"} is newer)</small>` : i.size ? ` <small>${fmtSize(i.size)}</small>` : ""}</li>`).join("")}</ul></details></li>`).join("")}</ul>
+        ${r.more ? `<p class="note">…and ${r.more} more.</p>` : ""}<p class="note">${fmtSize(r.bytes)} to copy. ${r.in_sync} file${r.in_sync === 1 ? " is" : "s are"} already the same.</p>`
+        : `<p>Everything is already in sync (${r.in_sync} file${r.in_sync === 1 ? "" : "s"}).</p>`}
+      ${r.skipped.length ? `<div class="conflicts"><b>Skipped (${r.skipped.length})</b><ul>${r.skipped.map(s => `<li><code>${esc(s.rel)}</code>: ${esc(s.why)}</li>`).join("")}</ul></div>` : ""}
+      ${r.risky ? `<p class="wstatus err" role="alert"><span class="dot"></span><span>This would remove a lot of files. If that isn’t what you expect, check that the right folders are paired. Automatic sync stays paused until you run this yourself.</span></p>` : ""}
+      <div class="cbtns"><span class="grow"></span><button class="btn" type="button" id="syClose">${n ? "Cancel" : "Close"}</button>${n ? `<button class="btn primary" type="button" id="syGo">Sync ${n} change${n === 1 ? "" : "s"}</button>` : ""}</div></section>`;
+    $("#syClose").onclick = () => { box.innerHTML = ""; };
+    const go = $("#syGo"); if (go) go.onclick = async () => { go.disabled = true;
+      try { const j = await postJSON("/api/sync/run", {id, confirm: true}); box.innerHTML = ""; trackJob(j, jj => { if (S.mode === "sync") renderSync(S.loadToken);
+          toast(jj.state === "done" ? (jj.errors.length ? `Synced with ${jj.errors.length} problem${jj.errors.length > 1 ? "s" : ""}` : "Folders are in sync") : jj.state === "cancelled" ? "Sync cancelled" : "Sync didn’t finish", {err: jj.state === "error"}); }); renderSync(S.loadToken); }
+      catch(e) { toast(e.message, {err:true}); go.disabled = false; } };
+  } catch(e) { box.innerHTML = ""; toast(e.message, {err:true}); }
+}
+PAGES.sync = renderSync;
 
 /*__NEWPAGES__*/
 

@@ -1644,6 +1644,389 @@ def ring_phone(serial):
     return {"at": f"{hour:02d}:{minute:02d}"}
 
 
+# ---------------------------------------------------------------- two-way folder sync
+# A pair is one Mac folder and one phone folder. A manifest remembers each file's size and modified time on both
+# sides as of the last sync, so Cellar can tell "changed on the Mac", "changed on the phone" and "changed on both".
+#   - Changed on one side: copied to the other side.
+#   - Changed on both sides: a conflict. The newer file keeps the name; the older one is kept next to it as
+#     "name (conflict DATE).ext" on both sides, and the conflict is listed until dismissed.
+#   - Deleted on one side: removed from the other side.
+#   - Nothing is ever deleted outright. Replaced or removed files on the Mac go to Downloads/Cellar/Sync versions;
+#     on the phone they go to the Cellar Trash.
+
+SYNC_DIR = os.path.join(SUPPORT_DIR, "sync")
+SYNC_VERSIONS = os.path.join(SAVE_DIR, "Sync versions")
+_sync_lock = threading.Lock()
+SYNC_LIST_CAP = 300
+
+
+def sync_pairs_all():
+    return load_cfg().get("sync_pairs", [])
+
+
+def sync_pair(pid):
+    for p in sync_pairs_all():
+        if p.get("id") == pid:
+            return p
+    raise AdbError("That folder pair doesn't exist any more.")
+
+
+def sync_update_pair(pid, fn):
+    def go(d):
+        for p in d.get("sync_pairs", []):
+            if p.get("id") == pid:
+                fn(p)
+    update_cfg(go)
+
+
+def sync_is_busy(pid):
+    return any(j["kind"] == "sync" and j["_spec"].get("pair") == pid and j["state"] in ("queued", "running") for j in list(JOBS.values()))
+
+
+def sync_public(p):
+    d = {k: p.get(k) for k in ("id", "name", "mac", "phone", "auto", "confirmed", "last", "conflicts", "last_error")}
+    d["busy"] = sync_is_busy(p["id"])
+    return d
+
+
+def sync_create(serial, mac, phone, name="", auto=False):
+    mac = os.path.abspath(os.path.expanduser(mac or ""))
+    home = os.path.expanduser("~")
+    if not os.path.isdir(mac):
+        raise AdbError("That folder on your Mac doesn't exist. Choose a folder that's already there.")
+    if mac in ("/", home) or mac.count("/") < 2 or mac.startswith(SYNC_VERSIONS):
+        raise AdbError("Choose a more specific folder than that. Syncing a whole home folder or disk isn't allowed.")
+    phone = clean_path(phone or "")
+    roots = storage_roots(serial)
+    if phone in roots or not any(phone.startswith(r + "/") for r in roots):
+        raise AdbError("Choose a folder on the phone, not the whole storage.")
+    if sh(serial, f"[ -d {q(phone)} ] && echo yes").strip() != "yes":
+        raise AdbError("That folder doesn't exist on the phone.")
+    hw = hw_id(serial)
+    for p in sync_pairs_all():
+        if p.get("hw") == hw and p["mac"] == mac and p["phone"] == phone:
+            raise AdbError("These two folders are already paired.")
+    pair = {"id": secrets.token_hex(4), "hw": hw, "mac": mac, "phone": phone, "name": (name or "").strip() or os.path.basename(mac),
+            "auto": bool(auto), "confirmed": False, "last": None, "conflicts": [], "last_error": None}
+    update_cfg(lambda d: d.setdefault("sync_pairs", []).append(pair))
+    return pair
+
+
+def sync_manifest_path(pid):
+    return os.path.join(SYNC_DIR, pid + ".json")
+
+
+def sync_manifest_load(pid):
+    try:
+        with open(sync_manifest_path(pid)) as f:
+            d = json.load(f)
+        return d.get("files", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def sync_manifest_save(pid, files):
+    os.makedirs(SYNC_DIR, exist_ok=True)
+    tmp = sync_manifest_path(pid) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"files": files, "at": int(time.time())}, f)
+    os.replace(tmp, sync_manifest_path(pid))
+
+
+def _hidden(rel):
+    return any(part.startswith(".") for part in rel.split("/"))
+
+
+def sync_scan_mac(folder):
+    out = {}
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for n in files:
+            if n.startswith("."):
+                continue
+            path = os.path.join(root, n)
+            try:
+                if os.path.islink(path) or not os.path.isfile(path):
+                    continue
+                st = os.stat(path)
+            except OSError:
+                continue
+            out[os.path.relpath(path, folder).replace(os.sep, "/")] = (st.st_size, int(st.st_mtime))
+    return out
+
+
+def sync_scan_phone(serial, folder):
+    script = f"find {q(folder)} -type f -exec stat -L -c '%s|%Y|%n' {{}} + 2>/dev/null"
+    out = {}
+    for line in sh(serial, script, timeout=600).splitlines():
+        parts = line.split("|", 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[2].startswith(folder + "/"):
+            rel = parts[2][len(folder) + 1:]
+            if not _hidden(rel):
+                out[rel] = (int(parts[0]), int(parts[1]))
+    return out
+
+
+def phone_md5(serial, paths):
+    tool = sh(serial, "command -v md5sum >/dev/null 2>&1 && echo md5sum || echo 'toybox md5sum'").strip() or "md5sum"
+    res = {}
+    for i in range(0, len(paths), 40):
+        out = sh(serial, f"{tool} " + " ".join(q(p) for p in paths[i:i + 40]) + " 2>/dev/null", timeout=1800)
+        for line in out.splitlines():
+            if len(line) > 34 and re.fullmatch(r"[0-9a-f]{32}", line[:32]):
+                res[line[34:]] = line[:32]
+    return res
+
+
+def mac_md5(path):
+    import hashlib
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def sync_plan(serial, pair):
+    """Works out what a sync would do, without changing anything."""
+    mac, phone = sync_scan_mac(pair["mac"]), sync_scan_phone(serial, pair["phone"])
+    man = sync_manifest_load(pair["id"])
+    items, same, skipped, maybe = [], [], [], []
+    lower = {}
+    for rel in phone:
+        lower.setdefault(rel.lower(), []).append(rel)
+    clash = {r for v in lower.values() if len(v) > 1 for r in v}
+
+    def item(op, rel, size=0, **kw):
+        items.append({"op": op, "rel": rel, "size": size, **kw})
+    for rel in sorted(set(mac) | set(phone) | set(man)):
+        if rel in clash:
+            skipped.append({"rel": rel, "why": "Another file on the phone differs only by capital letters, which the Mac can't tell apart."})
+            continue
+        m, p, b = mac.get(rel), phone.get(rel), man.get(rel)
+        if m and p:
+            cm = not b or m != (b["ms"], b["mm"])
+            cp = not b or p != (b["ps"], b["pm"])
+            if not cm and not cp:
+                same.append(rel)
+            elif cm and not cp:
+                item("push", rel, m[0], update=True)
+            elif cp and not cm:
+                item("pull", rel, p[0], update=True)
+            elif m[0] == p[0]:
+                maybe.append(rel)    # same size on both sides: compare contents before calling it a conflict
+            else:
+                item("conflict", rel, max(m[0], p[0]), winner="mac" if m[1] >= p[1] else "phone", mac_mtime=m[1], phone_mtime=p[1])
+        elif m:
+            if b and m == (b["ms"], b["mm"]):
+                item("rm_mac", rel, m[0])
+            else:
+                item("push", rel, m[0], update=False)
+        elif p:
+            if b and p == (b["ps"], b["pm"]):
+                item("rm_phone", rel, p[0])
+            else:
+                item("pull", rel, p[0], update=False)
+    if maybe:
+        ph = phone_md5(serial, [posixpath.join(pair["phone"], r) for r in maybe])
+        for rel in maybe:
+            if ph.get(posixpath.join(pair["phone"], rel)) == mac_md5(os.path.join(pair["mac"], rel)):
+                same.append(rel)
+            else:
+                m, p = mac[rel], phone[rel]
+                item("conflict", rel, max(m[0], p[0]), winner="mac" if m[1] >= p[1] else "phone", mac_mtime=m[1], phone_mtime=p[1])
+    counts = {}
+    for it in items:
+        counts[it["op"]] = counts.get(it["op"], 0) + 1
+    removals = counts.get("rm_mac", 0) + counts.get("rm_phone", 0)
+    risky = removals > max(10, len(man) // 2)
+    return {"items": items, "same": same, "skipped": skipped, "counts": counts, "risky": risky,
+            "bytes": sum(i["size"] for i in items if i["op"] in ("push", "pull", "conflict")), "_mac": mac, "_phone": phone}
+
+
+def sync_preview(serial, pid):
+    pair = sync_pair(pid)
+    plan = sync_plan(serial, pair)
+    return {"pair": sync_public(pair), "counts": plan["counts"], "in_sync": len(plan["same"]), "skipped": plan["skipped"][:50],
+            "risky": plan["risky"], "bytes": plan["bytes"], "total": len(plan["items"]),
+            "items": plan["items"][:SYNC_LIST_CAP], "more": max(0, len(plan["items"]) - SYNC_LIST_CAP)}
+
+
+def conflict_name(rel, stamp, taken):
+    d, n = posixpath.split(rel)
+    base, ext = os.path.splitext(n)
+    cand, i = f"{base} (conflict {stamp}){ext}", 2
+    while posixpath.join(d, cand) in taken:
+        cand, i = f"{base} (conflict {stamp} {i}){ext}", i + 1
+    taken.add(posixpath.join(d, cand))
+    return posixpath.join(d, cand)
+
+
+def sync_version_dest(pair, rel, stamp):
+    safe = re.sub(r"[/:\\]", "-", pair["name"]).strip(" .") or "folder"
+    return os.path.join(SYNC_VERSIONS, safe, stamp, *rel.split("/"))
+
+
+def run_sync(j):
+    sp, serial = j["_spec"], j["serial"]
+    pair = sync_pair(sp["pair"])
+    stamp = time.strftime("%Y-%m-%d %H%M%S")
+    cstamp = time.strftime("%Y-%m-%d %H%M")
+    mac_root, ph_root = pair["mac"], pair["phone"]
+    plan = sync_plan(serial, pair)
+    items = plan["items"]
+    j["items_total"], j["total"] = len(items), plan["bytes"]
+    mp = lambda rel: os.path.join(mac_root, *rel.split("/"))
+    pp = lambda rel: posixpath.join(ph_root, rel)
+    taken = set(plan["_mac"]) | set(plan["_phone"])
+    done_ok, failed, stats = set(), set(), {"push": 0, "pull": 0, "conflict": 0, "rm_mac": 0, "rm_phone": 0}
+    conflicts, moved = [], 0
+
+    def fail(rel, msg):
+        j["errors"].append([rel, msg])
+        failed.add(rel)
+
+    def push(rel, dst_rel=None, src_rel=None):
+        dst = pp(dst_rel or rel)
+        sh(serial, f"mkdir -p {q(posixpath.dirname(dst))}")
+        rc, out = run_proc(j, [ADB, "-s", serial, "push", mp(src_rel or rel), dst])
+        if rc != 0:
+            raise AdbError(adb_msg(out))
+
+    def pull(rel, dst_rel=None, src_rel=None):
+        dst = mp(dst_rel or rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        rc, out = run_proc(j, [ADB, "-s", serial, "pull", "-a", pp(src_rel or rel), dst])
+        if rc != 0:
+            raise AdbError(adb_msg(out))
+
+    def to_versions(rel):
+        dest = sync_version_dest(pair, rel, stamp)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.move(mp(rel), dest)
+
+    base = 0
+    # Phone files that are about to be replaced or removed go to the phone's Trash first, in one batch.
+    trash_first = [pp(i["rel"]) for i in items if (i["op"] == "push" and i.get("update")) or i["op"] == "rm_phone" or (i["op"] == "conflict" and i["winner"] == "mac")]
+    if trash_first:
+        phone_trash(serial, trash_first)
+    for it in items:
+        check_cancel(j)
+        rel, op = it["rel"], it["op"]
+        j["current"] = rel
+        try:
+            if op == "push":
+                push(rel)
+            elif op == "pull":
+                if it.get("update"):
+                    to_versions(rel)
+                pull(rel)
+            elif op == "rm_mac":
+                to_versions(rel)
+            elif op == "rm_phone":
+                pass   # already in the phone's Trash
+            elif op == "conflict":
+                cname = conflict_name(rel, cstamp, taken)
+                if it["winner"] == "mac":   # keep the phone's older file as the conflict copy on both sides
+                    # the phone original is already in the Trash, so restore it from there under the conflict name
+                    entry = next((e for e in reversed(trash_read(serial, root_of(ph_root, storage_roots(serial)))) if e["orig"] == pp(rel)), None)
+                    if not entry:
+                        raise AdbError("Couldn't keep the phone's version.")
+                    td = trash_dir(root_of(ph_root, storage_roots(serial)))
+                    tmp = os.path.join(tempfile.mkdtemp(), posixpath.basename(cname))
+                    rc, out = run_proc(j, [ADB, "-s", serial, "pull", "-a", td + "/" + entry["id"] + "__" + entry["name"], tmp])
+                    if rc != 0:
+                        raise AdbError(adb_msg(out))
+                    os.makedirs(os.path.dirname(mp(cname)), exist_ok=True)
+                    shutil.move(tmp, mp(cname))
+                    push(rel)
+                    push(cname)
+                else:                      # keep the Mac's older file as the conflict copy on both sides
+                    os.makedirs(os.path.dirname(mp(cname)), exist_ok=True)
+                    shutil.copy2(mp(rel), mp(cname))
+                    push(cname)
+                    pull(rel)
+                conflicts.append({"rel": rel, "kept": cname, "newer": it["winner"], "at": int(time.time())})
+                done_ok.add(cname)
+            done_ok.add(rel)
+            stats[op] += 1
+        except Cancelled:
+            raise
+        except (AdbError, OSError) as e:
+            fail(rel, str(e))
+        base += it["size"] if op in ("push", "pull", "conflict") else 0
+        j["items_done"] += 1
+        set_progress(j, base)
+    # Record what both sides look like now, only for files that are really in step.
+    mac_now, ph_now = sync_scan_mac(mac_root), sync_scan_phone(serial, ph_root)
+    man = sync_manifest_load(pair["id"])
+    for rel in list(man):
+        if rel not in mac_now and rel not in ph_now:
+            del man[rel]
+    for rel in set(plan["same"]) | done_ok:
+        if rel in failed:
+            continue
+        m, p = mac_now.get(rel), ph_now.get(rel)
+        if m and p:
+            man[rel] = {"ms": m[0], "mm": m[1], "ps": p[0], "pm": p[1]}
+        elif rel in man:
+            del man[rel]
+    sync_manifest_save(pair["id"], man)
+    summary = {"pushed": stats["push"], "pulled": stats["pull"], "conflicts": stats["conflict"], "removed_mac": stats["rm_mac"],
+               "removed_phone": stats["rm_phone"], "failed": len(failed), "at": int(time.time())}
+
+    def save(p):
+        p["last"] = summary
+        p["last_error"] = None if not failed else f"{len(failed)} file{'s' if len(failed) != 1 else ''} couldn't be synced."
+        p["conflicts"] = (p.get("conflicts") or []) + conflicts
+    sync_update_pair(pair["id"], save)
+    j["result"] = summary
+
+
+def sync_start(serial, pid, confirm=False, auto=False):
+    pair = sync_pair(pid)
+    if pair.get("hw") != hw_id(serial):
+        raise AdbError("This folder pair belongs to a different phone.")
+    if not pair.get("confirmed") and not confirm:
+        raise AdbError("Look over the planned changes first, then choose Sync.")
+    with _sync_lock:
+        if sync_is_busy(pid):
+            raise AdbError("This pair is already syncing.")
+        sync_update_pair(pid, lambda p: p.update(confirmed=True))
+        return new_job("sync", serial, f"Sync “{pair['name']}”", {"pair": pid})
+
+
+def _run_sync_wrapper(j):
+    try:
+        run_sync(j)
+    except Cancelled:
+        raise
+    except Exception as e:
+        msg = str(e) or e.__class__.__name__
+        sync_update_pair(j["_spec"]["pair"], lambda p: p.update(last_error=msg))
+        raise
+
+
+RUNNERS["sync"] = _run_sync_wrapper
+
+
+def sync_auto(serial):
+    """On connect: sync every confirmed pair that has automatic sync on, unless the plan would remove a lot."""
+    hw = hw_id(serial)
+    for p in sync_pairs_all():
+        if p.get("hw") != hw or not p.get("auto") or not p.get("confirmed"):
+            continue
+        try:
+            plan = sync_plan(serial, p)
+            if plan["risky"]:
+                notify("Cellar", f"Sync paused for “{p['name']}”: it would remove many files. Open Cellar to review.")
+                continue
+            if plan["items"]:
+                sync_start(serial, p["id"])
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
@@ -2023,6 +2406,10 @@ def on_connect(serial):
     try:
         if settings.get("finder_auto"):
             finder_mount(serial)
+    except Exception:
+        pass
+    try:
+        sync_auto(serial)
     except Exception:
         pass
     try:
@@ -2682,6 +3069,38 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
         elif R == ("POST", "/api/ring"):
             self.body_json()   # always drain the request body so the connection stays in sync
             self.send_json(ring_phone(s))
+        elif R == ("GET", "/api/sync"):
+            hw = hw_id(s)
+            self.send_json({"pairs": [sync_public(p) for p in sync_pairs_all() if p.get("hw") == hw], "versions": SYNC_VERSIONS})
+        elif R == ("POST", "/api/sync/pairs"):
+            d = self.body_json()
+            self.send_json(sync_public(sync_create(s, d.get("mac"), d.get("phone"), d.get("name", ""), d.get("auto", False))))
+        elif R == ("POST", "/api/sync/pairs/update"):
+            d = self.body_json()
+            sync_pair(d.get("id"))
+            def upd(p):
+                if "auto" in d:
+                    p["auto"] = bool(d["auto"])
+                if isinstance(d.get("name"), str) and d["name"].strip():
+                    p["name"] = d["name"].strip()
+                if d.get("dismiss_conflicts"):
+                    p["conflicts"] = []
+            sync_update_pair(d["id"], upd)
+            self.send_json(sync_public(sync_pair(d["id"])))
+        elif R == ("POST", "/api/sync/pairs/delete"):
+            pid = self.body_json().get("id")
+            sync_pair(pid)
+            update_cfg(lambda c: c.update(sync_pairs=[p for p in c.get("sync_pairs", []) if p.get("id") != pid]))
+            try:
+                os.remove(sync_manifest_path(pid))
+            except OSError:
+                pass
+            self.send_json({"ok": True})
+        elif R == ("GET", "/api/sync/preview"):
+            self.send_json(sync_preview(s, arg("id")))
+        elif R == ("POST", "/api/sync/run"):
+            d = self.body_json()
+            self.send_json(public_job(sync_start(s, d.get("id"), confirm=bool(d.get("confirm")))))
         elif R == ("GET", "/api/volumes"):
             self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):
@@ -2700,7 +3119,8 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
         elif R == ("POST", "/api/pickfolder"):
             if not IS_MAC:
                 raise AdbError("Folder picker needs macOS")
-            r = subprocess.run(["osascript", "-e", 'POSIX path of (choose folder with prompt "Choose where Cellar saves backups")'],
+            prompt = re.sub(r'["\\]', "", (arg("prompt") or "Choose where Cellar saves backups"))[:80]
+            r = subprocess.run(["osascript", "-e", f'POSIX path of (choose folder with prompt "{prompt}")'],
                                capture_output=True, text=True, timeout=600)
             self.send_json({"path": r.stdout.strip().rstrip("/")} if r.returncode == 0 else {"cancelled": True})
         elif R == ("GET", "/api/apps"):
