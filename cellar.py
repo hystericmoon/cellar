@@ -1864,6 +1864,58 @@ def install_scrcpy():
 MIRRORS = {}
 
 
+_scrcpy_ver = {}
+
+
+def scrcpy_version(exe):
+    if exe not in _scrcpy_ver:
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10).stdout
+            m = re.search(r"scrcpy\s+(\d+)\.(\d+)", out)
+            _scrcpy_ver[exe] = (int(m.group(1)), int(m.group(2))) if m else None
+        except (OSError, subprocess.TimeoutExpired):
+            _scrcpy_ver[exe] = None
+    return _scrcpy_ver[exe]
+
+
+def android_major(release):
+    m = re.match(r"\d+", release or "")
+    return int(m.group(0)) if m else 0
+
+
+def build_mirror_cmd(exe, serial, opts, info, version):
+    """The scrcpy command line for a screen or camera window. Raises AdbError with the fix when camera mode can't work."""
+    name = f"{info['manufacturer']} {info['model']}".strip() or "Phone"
+    camera = opts.get("source") == "camera"
+    cmd = [exe, "-s", serial]
+    if camera:
+        if android_major(info.get("android")) < 12:
+            raise AdbError(f"Phone camera needs Android 12 or newer. This phone has Android {info.get('android') or 'unknown'}.")
+        if version is not None and version < (2, 2):
+            raise AdbError("Your copy of scrcpy is too old for the camera (it needs 2.2 or newer). Update it with “brew upgrade scrcpy”, then try again.")
+        facing = opts.get("facing") if opts.get("facing") in ("front", "back", "external") else "back"
+        cmd += ["--video-source=camera", f"--camera-facing={facing}", "--no-control", "--window-title", f"{name} camera ({facing})"]
+        if opts.get("mic"):
+            cmd.append("--audio-source=mic")
+        else:
+            cmd.append("--no-audio")
+    else:
+        cmd += ["--window-title", name]
+        if opts.get("screen_off"):
+            cmd.append("--turn-screen-off")
+        if opts.get("stay_awake", True):
+            cmd.append("--stay-awake")
+        if opts.get("no_audio"):
+            cmd.append("--no-audio")
+        if opts.get("keyboard") == "uhid":
+            cmd.append("--keyboard=uhid")
+    if opts.get("record"):
+        os.makedirs(SAVE_DIR, exist_ok=True)
+        label = "Camera recording" if camera else "Screen recording"
+        cmd.append("--record=" + os.path.join(SAVE_DIR, time.strftime(label + " %Y-%m-%d %H.%M.%S.mp4")))
+    return cmd
+
+
 def start_mirror(serial, opts):
     exe = find_scrcpy()
     if not exe:
@@ -1872,19 +1924,7 @@ def start_mirror(serial, opts):
     if old and old.poll() is None:
         return {"running": True}
     env = dict(os.environ, ADB=ADB or "adb")
-    title = device_info(serial)
-    cmd = [exe, "-s", serial, "--window-title", f"{title['manufacturer']} {title['model']}".strip() or "Phone"]
-    if opts.get("screen_off"):
-        cmd.append("--turn-screen-off")
-    if opts.get("stay_awake", True):
-        cmd.append("--stay-awake")
-    if opts.get("no_audio"):
-        cmd.append("--no-audio")
-    if opts.get("record"):
-        os.makedirs(SAVE_DIR, exist_ok=True)
-        cmd.append("--record=" + os.path.join(SAVE_DIR, time.strftime("Screen recording %Y-%m-%d %H.%M.%S.mp4")))
-    if opts.get("keyboard") == "uhid":
-        cmd.append("--keyboard=uhid")
+    cmd = build_mirror_cmd(exe, serial, opts, device_info(serial), scrcpy_version(exe))
     MIRRORS[serial] = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"running": True}
 
@@ -2610,7 +2650,8 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
                 raise AdbError("Couldn't uninstall: " + adb_msg(out))
             self.send_json({"ok": True})
         elif R == ("GET", "/api/tools"):
-            self.send_json({"adb": ADB, "scrcpy": find_scrcpy(), "mac": IS_MAC})
+            exe = find_scrcpy()
+            self.send_json({"adb": ADB, "scrcpy": exe, "scrcpy_version": list(scrcpy_version(exe) or []) if exe else None, "mac": IS_MAC})
         elif R == ("POST", "/api/tools/install"):
             tool = arg("tool")
             self.send_json(install_adb() if tool == "adb" else install_scrcpy())

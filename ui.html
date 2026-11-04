@@ -1378,15 +1378,29 @@ async function renderMirror(msg) {
       try { await api("/api/tools/install", {tool:"scrcpy"}, {method:"POST"}); renderMirror(); } catch(e) { renderMirror(e.message); } };
     return;
   }
-  b.innerHTML = `<p class="muted">Shows the phone's screen in a window on your Mac. Use your mouse and keyboard to control it. Phone sound plays on the Mac (Android 11+).</p>
+  const droid = parseInt((S.info && S.info.android) || "0", 10), sv = tools.scrcpy_version || [], camOk = droid >= 12 && (!sv.length || sv[0] > 2 || (sv[0] === 2 && sv[1] >= 2));
+  const camWhy = droid && droid < 12 ? `Needs Android 12 or newer. This phone has Android ${droid}.` : (sv.length && !camOk ? "Needs scrcpy 2.2 or newer. Run “brew upgrade scrcpy”." : "");
+  b.innerHTML = `<div class="tabs" role="radiogroup" aria-label="What to show" style="grid-template-columns:1fr 1fr"><button type="button" role="radio" id="mrScreenTab" aria-checked="true" aria-selected="true">Phone screen</button><button type="button" role="radio" id="mrCamTab" aria-checked="false" aria-selected="false" ${camOk ? "" : "aria-disabled=\"true\""} title="${esc(camWhy)}">Phone camera${camOk ? "" : "<small>" + esc(camWhy) + "</small>"}</button></div>
+    <div id="mrScreen"><p class="muted">Shows the phone's screen in a window on your Mac. Use your mouse and keyboard to control it. Phone sound plays on the Mac (Android 11+).</p>
     <label class="toggle"><input type="checkbox" id="mrOff"><span><b>Turn the phone's screen off</b><small>Keeps mirroring while saving battery and privacy.</small></span></label>
     <label class="toggle"><input type="checkbox" id="mrRec"><span><b>Record to a video on your Mac</b><small>Saved in Downloads/Cellar when you close the window.</small></span></label>
     <label class="toggle"><input type="checkbox" id="mrKbd"><span><b>Use the Mac keyboard as a real keyboard</b><small>Better for typing in any app, including games and non-English layouts.</small></span></label>
     <label class="toggle"><input type="checkbox" id="mrMute"><span><b>No sound</b><small>Keep the phone's audio on the phone.</small></span></label>
+    </div>
+    <div id="mrCamera" hidden><p class="muted">Uses the phone's camera as a webcam in a window on your Mac. You can't control the phone while it's on.</p>
+      <label class="field">Which camera<select id="mrFacing"><option value="back">Back camera</option><option value="front">Front (selfie) camera</option><option value="external">External camera (USB)</option></select></label>
+      <label class="toggle"><input type="checkbox" id="mrMic"><span><b>Include the phone's microphone</b><small>Off by default, so nothing is recorded or heard unless you choose.</small></span></label>
+      <label class="toggle"><input type="checkbox" id="mrCamRec"><span><b>Record to a video on your Mac</b><small>Saved in Downloads/Cellar when you close the window.</small></span></label></div>
     <div class="cbtns"><span class="grow"></span><button class="btn primary" type="button" id="mrStart">Start mirroring</button></div>`;
+  const pick = cam => { if (cam && !camOk) return toast(camWhy || "The camera isn't available on this phone.", {err:true});
+    $("#mrScreen").hidden = cam; $("#mrCamera").hidden = !cam; $("#mrStart").textContent = cam ? "Start camera" : "Start mirroring";
+    [["mrScreenTab", !cam], ["mrCamTab", cam]].forEach(([id, on]) => { $("#" + id).setAttribute("aria-checked", on); $("#" + id).setAttribute("aria-selected", on); }); };
+  $("#mrScreenTab").onclick = () => pick(false); $("#mrCamTab").onclick = () => pick(true);
   $("#mrStart").onclick = async () => {
-    try { await postJSON("/api/mirror", {screen_off: $("#mrOff").checked, record: $("#mrRec").checked, keyboard: $("#mrKbd").checked ? "uhid" : "", no_audio: $("#mrMute").checked});
-      MR.close(); toast("Mirroring started. It opens in its own window."); }
+    const cam = !$("#mrCamera").hidden;
+    try { await postJSON("/api/mirror", cam ? {source:"camera", facing: $("#mrFacing").value, mic: $("#mrMic").checked, record: $("#mrCamRec").checked}
+      : {screen_off: $("#mrOff").checked, record: $("#mrRec").checked, keyboard: $("#mrKbd").checked ? "uhid" : "", no_audio: $("#mrMute").checked});
+      MR.close(); toast(cam ? "The camera is opening in its own window." : "Mirroring started. It opens in its own window."); }
     catch(e) { if (e.message === "need_scrcpy") renderMirror(); else toast(e.message, {err:true}); } };
 }
 
