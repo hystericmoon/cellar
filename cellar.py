@@ -1074,6 +1074,118 @@ def phone_recent(serial, days=14):
     return {"entries": entries[:300]}
 
 
+# ---------------------------------------------------------------- scans (storage breakdown, duplicates)
+# A scan walks the phone in the background. The page starts one, then polls it for progress and the result.
+
+SCANS = {}
+_scan_lock = threading.Lock()
+
+TYPE_EXT = {
+    "Photos": "jpg jpeg png gif webp heic heif bmp dng raw cr2 nef arw",
+    "Videos": "mp4 mov mkv webm avi 3gp m4v mpg mpeg",
+    "Audio": "mp3 m4a aac wav flac ogg opus amr mid midi",
+    "Documents": "pdf doc docx xls xlsx ppt pptx odt ods odp txt rtf md csv epub vcf ics",
+    "Apps": "apk xapk apks aab",
+    "Archives": "zip rar 7z tar gz tgz bz2 xz",
+}
+_EXT_KIND = {e: k for k, v in TYPE_EXT.items() for e in v.split()}
+TYPE_ORDER = list(TYPE_EXT) + ["Other"]
+
+
+def type_of(name):
+    return _EXT_KIND.get(os.path.splitext(name)[1].lstrip(".").lower(), "Other")
+
+
+def start_scan(kind, serial, root, **opts):
+    root = clean_path(root or HOME_DIR)
+    with _scan_lock:
+        for old in [k for k, v in SCANS.items() if v["state"] != "running" and time.time() - v["created"] > 3600]:
+            SCANS.pop(old, None)
+        sc = {"id": secrets.token_hex(5), "kind": kind, "serial": serial, "root": root, "opts": opts, "state": "running",
+              "progress": "Starting…", "result": None, "error": None, "created": time.time(), "_cancel": False}
+        SCANS[sc["id"]] = sc
+
+    def work():
+        try:
+            sc["result"] = SCAN_RUNNERS[kind](sc)
+            sc["state"] = "cancelled" if sc["_cancel"] else "done"
+        except Cancelled:
+            sc["state"] = "cancelled"
+        except Exception as e:
+            sc["error"], sc["state"] = str(e) or e.__class__.__name__, "error"
+    threading.Thread(target=work, daemon=True).start()
+    return public_scan(sc)
+
+
+def public_scan(sc):
+    return {k: v for k, v in sc.items() if not k.startswith("_") and k != "serial"}
+
+
+def scan_check(sc):
+    if sc["_cancel"]:
+        raise Cancelled()
+
+
+def scan_find_files(sc, fmt="%s|%Y|%n", extra=""):
+    """Every readable file under the scan root (Trash and the protected Android folders left out)."""
+    root = sc["root"]
+    vol = root_of(root, storage_roots(sc["serial"]))
+    script = (f"find {q(root)} \\( -path {q(vol + '/Android/data')} -o -path {q(vol + '/Android/obb')} "
+              f"-o -path {q(trash_dir(vol))} \\) -prune -o -type f {extra} -exec stat -L -c {q(fmt)} {{}} + 2>/dev/null")
+    out = sh(sc["serial"], script, timeout=900)
+    rows = []
+    for line in out.splitlines():
+        parts = line.split("|", fmt.count("|"))
+        if len(parts) == fmt.count("|") + 1 and parts[0].isdigit():
+            rows.append(parts)
+    return rows
+
+
+def scan_space(sc):
+    """Storage by folder and by file type, plus the biggest files."""
+    serial, root = sc["serial"], sc["root"]
+    sc["progress"] = "Looking through your files…"
+    rows = scan_find_files(sc)
+    scan_check(sc)
+    sc["progress"] = f"Adding up {len(rows):,} files…"
+    types, folders, loose = {}, {}, {"bytes": 0, "count": 0}
+    total = 0
+    for size, mtime, path in rows:
+        size = int(size)
+        total += size
+        t = types.setdefault(type_of(path), {"bytes": 0, "count": 0})
+        t["bytes"] += size
+        t["count"] += 1
+        rel = path[len(root):].lstrip("/").split("/")
+        if len(rel) == 1:
+            loose["bytes"] += size
+            loose["count"] += 1
+            continue
+        top = folders.setdefault(rel[0], {"bytes": 0, "count": 0, "kids": {}})
+        top["bytes"] += size
+        top["count"] += 1
+        if len(rel) > 2:
+            kid = top["kids"].setdefault(rel[1], {"bytes": 0, "count": 0})
+            kid["bytes"] += size
+            kid["count"] += 1
+    big = sorted(rows, key=lambda r: -int(r[0]))[:100]
+    trash_kb = sh(serial, f"du -sk {q(trash_dir(root))} 2>/dev/null | cut -f1").strip()
+    return {
+        "root": root, "total": total, "files": len(rows), "at": int(time.time()),
+        "trash": int(trash_kb) * 1024 if trash_kb.isdigit() else 0,
+        "types": [{"type": k, **types[k]} for k in TYPE_ORDER if k in types],
+        "folders": [{"name": k, "path": posixpath.join(root, k), **{x: v[x] for x in ("bytes", "count")},
+                     "kids": [{"name": n, "path": posixpath.join(root, k, n), **kv}
+                              for n, kv in sorted(v["kids"].items(), key=lambda i: -i[1]["bytes"])[:5]]}
+                    for k, v in sorted(folders.items(), key=lambda i: -i[1]["bytes"])[:30]],
+        "loose": loose,
+        "biggest": [{"name": posixpath.basename(p), "path": p, "size": int(sz), "mtime": int(mt), "dir": False, "type": type_of(p)} for sz, mt, p in big],
+    }
+
+
+SCAN_RUNNERS = {"space": scan_space}
+
+
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
@@ -2034,6 +2146,21 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(phone_trash_empty(s, set(ids) if ids else None))
         elif R == ("GET", "/api/search"):
             self.send_json(phone_search(s, arg("q"), arg("root") or HOME_DIR))
+        elif R == ("POST", "/api/scan"):
+            d = self.body_json()
+            if d.get("kind") not in SCAN_RUNNERS:
+                raise AdbError("Unknown scan")
+            self.send_json(start_scan(d["kind"], s, d.get("root"), **(d.get("opts") or {})))
+        elif R == ("GET", "/api/scan"):
+            sc = SCANS.get(arg("id"))
+            if not sc:
+                raise AdbError("That scan has expired. Start it again.")
+            self.send_json(public_scan(sc))
+        elif R == ("POST", "/api/scan/cancel"):
+            sc = SCANS.get(arg("id"))
+            if sc:
+                sc["_cancel"] = True
+            self.send_json({"ok": True})
         elif R == ("GET", "/api/volumes"):
             self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):

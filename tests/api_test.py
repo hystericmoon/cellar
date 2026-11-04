@@ -95,3 +95,19 @@ r=call("/api/search",q="sd-notes"); ok(r["entries"]==[], "internal search doesn'
 os.utime(SD+"/Documents/sd-notes.txt")
 r=call("/api/recent"); ok(any(e["path"].startswith(SD) for e in r["entries"]), "recent includes the card")
 call("/api/trash/empty","POST",{})
+# --- step 2: what's taking space
+def scan(kind, root=None, **opts):
+    sc=call("/api/scan","POST",{"kind":kind,"root":root or H,"opts":opts})
+    for _ in range(150):
+        sc=call("/api/scan",id=sc["id"])
+        if sc["state"]!="running": return sc
+        time.sleep(0.2)
+sc=scan("space"); r=sc["result"]
+ok(sc["state"]=="done" and r["total"]>3_000_000 and r["files"]>10, f"space scan {sc['state']} {r['total']} bytes in {r['files']} files")
+tn={t["type"]:t for t in r["types"]}; ok("Photos" in tn and "Documents" in tn and "Apps" in tn and tn["Apps"]["bytes"]==500_000, f"by type {list(tn)}")
+ok(r["biggest"][0]["size"]>=r["biggest"][-1]["size"] and r["biggest"][0]["name"]=="report.pdf", f"biggest first: {r['biggest'][0]['name']}")
+fn={f["name"]:f for f in r["folders"]}; ok("Download" in fn and "DCIM" in fn and fn["DCIM"]["kids"] and r["folders"][0]["bytes"]>=r["folders"][-1]["bytes"], f"by folder {list(fn)[:4]}")
+ok(sum(t["bytes"] for t in r["types"])==r["total"], "type totals add up")
+ok(not any(".CellarTrash" in e["path"] or "/Android/data" in e["path"] for e in r["biggest"]), "Trash and protected folders left out")
+sc=scan("space", SD); ok(sc["state"]=="done" and sc["result"]["files"]>=1 and all(e["path"].startswith(SD) for e in sc["result"]["biggest"]), "space scan on the SD card stays on the card")
+r=call("/api/scan","POST",{"kind":"nope"}); ok("Unknown" in r.get("error",""), "unknown scan refused")

@@ -270,6 +270,29 @@ dialog.small{width:min(520px,94vw)}
 .pathbox code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:8px 10px;border-radius:8px}
 .addmenu-anchor{position:relative}
 @media (max-width:820px){#transfers{width:100%}}
+
+/* ---------- analysis pages ---------- */
+.linkbtn{background:none;border:0;padding:0;color:var(--text);text-decoration:underline;text-underline-offset:2px;cursor:pointer;font:inherit}
+.typebar{display:flex;height:14px;border-radius:99px;overflow:hidden;gap:2px;background:var(--panel)}
+.typebar i{display:block;min-width:3px}
+.legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 18px}
+.legend li{display:flex;align-items:center;gap:8px;font-size:13px}
+.legend i{width:10px;height:10px;border-radius:3px;flex:none}
+.legend span{flex:1}.legend small{color:var(--muted);min-width:70px;text-align:right}
+.legend b{font-weight:560;font-variant-numeric:tabular-nums}
+.fold details{border-top:1px solid var(--line)}.fold details:first-child{border-top:0}
+.fold summary{display:grid;grid-template-columns:minmax(120px,32%) 1fr 84px;gap:12px;align-items:center;padding:9px 4px;cursor:pointer;list-style:none;border-radius:6px}
+.fold summary::-webkit-details-marker{display:none}.fold summary:hover{background:var(--hover)}
+.fold b{text-align:right;font-weight:560;font-variant-numeric:tabular-nums}
+.fname{display:flex;align-items:center;gap:8px;min-width:0}.fname svg{width:16px;height:16px;flex:none;color:var(--muted)}
+.fname span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbar{height:8px;border-radius:99px;background:var(--hover);overflow:hidden}.fbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.fkids{padding:2px 8px 12px 30px;display:grid;gap:6px;justify-items:start;font-size:13px}.fkids p{margin:0}
+.fkid{display:flex;gap:14px;width:100%;max-width:420px;justify-content:space-between}.fkid span{color:var(--muted);font-variant-numeric:tabular-nums}
+.floose{display:flex;justify-content:space-between;padding:9px 4px;border-top:1px solid var(--line);color:var(--muted)}
+.spbar{display:flex;gap:8px;flex-wrap:wrap}
+.scanning{justify-items:center}
+.group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
 <body>
@@ -583,7 +606,10 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const PAGES = {};   // page-style views (not file lists): name -> async render(token)
+const isPage = () => !!PAGES[S.mode];
+I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
 I.search = '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>';
@@ -592,7 +618,7 @@ function setHash(h, replace) { if (replace) history.replaceState(null, "", h); e
 function routeFromHash(replace) {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith(":search:")) return showSearch(h.slice(8), replace);
-  if (h.startsWith(":")) { const v = h.slice(1); if (["recent","trash","backup","apps"].includes(v)) return showView(v, replace); }
+  if (h.startsWith(":")) { const v = h.slice(1); if (v === "recent" || v === "trash" || PAGES[v]) return showView(v, replace); }
   go(h && h.startsWith("/") ? h : HOME, replace);
 }
 window.addEventListener("popstate", () => { if (S.serial) routeFromHash(true); });
@@ -642,8 +668,7 @@ async function showView(v, replace) {
     if (v === "recent") { const r = await api("/api/recent"); if (S.loadToken !== token) return; S.entries = r.entries; render(); }
     else if (v === "trash") { const r = await api("/api/trash"); if (S.loadToken !== token) return;
       S.trashDays = r.days; S.entries = r.entries.map(t => ({name:t.name, path:t.orig, dir:t.dir, size:t.size, mtime:t.time, trashId:t.id})); render(); }
-    else if (v === "backup") { await renderBackup(token); }
-    else if (v === "apps") { await renderApps(token); }
+    else if (PAGES[v]) { await PAGES[v](token); }
   } catch(e) { if (S.loadToken === token) $("#content").innerHTML = stateHTML("empty", "Couldn't load this", esc(e.message)); }
   finally { endLoad(token); }
 }
@@ -749,7 +774,7 @@ function syncSel() {
   document.querySelectorAll("[data-row]").forEach(r => { const e = list[+r.dataset.row]; if (!e) return; const on = S.sel.has(ep(e)); r.classList.toggle("selected", on);
     const box = r.querySelector("[data-sel]"); if (box) box.checked = on; });
   const all = $("#selAllBox"); if (all) { all.checked = S.sel.size > 0 && S.sel.size === list.length; all.indeterminate = S.sel.size > 0 && S.sel.size < list.length; }
-  const bar = $("#selbar"), n = S.sel.size; bar.hidden = !n || S.mode === "apps" || S.mode === "backup";
+  const bar = $("#selbar"), n = S.sel.size; bar.hidden = !n || isPage();
   document.querySelector("main").classList.toggle("selecting", !bar.hidden); document.body.classList.toggle("selecting", !bar.hidden);
   if (n) { const picked = selected(), folders = picked.filter(e => e.dir).length, size = picked.reduce((a, e) => a + e.size, 0);
     $("#selText").textContent = `${n} selected` + (size ? ` · ${fmtSize(size)}` : "") + (folders ? ` · ${folders} folder${folders > 1 ? "s" : ""}` : "");
@@ -790,7 +815,7 @@ $("#selAll").onclick = selectAll;
 $("#selClear").onclick = clearSel;
 $("#selSave").onclick = () => S.mode === "trash" ? putBack(selected()) : saveEntries(selected());
 $("#selTrash").onclick = () => S.mode === "trash" ? deleteForever(selected()) : trashEntries(selected());
-document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { S.view = b.dataset.view; store.set("view", S.view); if (S.mode !== "apps" && S.mode !== "backup") render(); });
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { S.view = b.dataset.view; store.set("view", S.view); if (!isPage()) render(); });
 
 function open(e) {
   if (S.mode === "trash") return putBack([e]);
@@ -871,7 +896,7 @@ function folderMenu() {
     {label: "Refresh", key: "", run: refresh}];
 }
 $("#content").addEventListener("contextmenu", e => {
-  if (S.mode === "apps" || S.mode === "backup" || e.target.closest("input.rename")) return;
+  if (isPage() || e.target.closest("input.rename")) return;
   const row = e.target.closest("[data-row]"); e.preventDefault();
   if (row) { const ent = S.visible[+row.dataset.row]; if (!S.sel.has(ep(ent))) { S.sel.clear(); S.sel.add(ep(ent)); anchor = +row.dataset.row; syncSel(); }
     openMenu(entryMenu(selected()), e.clientX, e.clientY, row.querySelector("[data-i]")); }
@@ -1112,7 +1137,7 @@ async function saveEntries(list) {
       const pol = await resolveConflicts([e], ex, "Downloads/Cellar"); if (!pol || !pol.has(e.name)) return;
       body = {kind:"pull", items:[{path: ep(e), policy: pol.get(e.name)}]};
     } else {
-      const from = S.mode === "folder" ? placeLabel(S.listPath) : (S.mode === "search" ? "Search" : S.mode === "trash" ? "Trash" : "Recent");
+      const from = S.mode === "folder" ? placeLabel(S.listPath) : S.mode === "space" ? "Large files" : (S.mode === "search" ? "Search" : S.mode === "trash" ? "Trash" : "Recent");
       body = {kind:"pull", into: `${from} ${stamp()}`, items: list.map(e => ({path: ep(e)}))};
     }
     const job = await postJob(body); clearSel();
@@ -1507,6 +1532,97 @@ document.addEventListener("keydown", e => {
     if (e.shiftKey) { if (anchor == null) anchor = Math.max(0, i); S.sel.clear(); const [a, b] = [Math.min(anchor, n), Math.max(anchor, n)]; for (let q = a; q <= b; q++) S.sel.add(ep(S.visible[q])); syncSel(); } }
   else if (e.key === "Escape") { if (S.sel.size) clearSel(); else if (S.clip) { S.clip = null; renderHint(); render(); } }
 });
+
+PAGES.backup = renderBackup; PAGES.apps = renderApps;
+/* ---------- shared: background scans (storage breakdown, duplicates) ---------- */
+async function runScan(kind, root, opts, token, onTick) {
+  const sc = await postJSON("/api/scan", {kind, root, opts}); let cur = sc;
+  while (cur.state === "running") {
+    if (S.loadToken !== token) { api("/api/scan/cancel", {id: sc.id}, {method:"POST"}).catch(() => {}); throw new Error("cancelled"); }
+    if (onTick) onTick(cur);
+    await new Promise(r => setTimeout(r, 700)); cur = await api("/api/scan", {id: sc.id});
+  }
+  if (cur.state === "error") throw new Error(cur.error);
+  if (cur.state === "cancelled") throw new Error("cancelled");
+  return cur.result;
+}
+const scanBusy = (title, text, id) => `<div class="page"><h1>${title}</h1><div class="panel scanning" role="status"><div class="spinner" style="margin:6px auto"></div><p id="${id}" class="muted" style="text-align:center;margin:0">${esc(text)}</p><p style="text-align:center;margin:0" class="muted">This can take a minute on a full phone. You can keep using Cellar.</p></div></div>`;
+const rootTabs = (cur, attr) => { const roots = [{path:HOME, name:"Internal storage"}, ...VOLS]; if (roots.length < 2) return "";
+  return `<div class="tabs" role="tablist" style="grid-template-columns:repeat(${roots.length},1fr);max-width:${roots.length * 190}px">${roots.map(r => `<button type="button" role="tab" ${attr}="${esc(r.path)}" aria-selected="${r.path === cur}">${esc(r.name)}</button>`).join("")}</div>`; };
+const pct = (a, b) => b ? Math.max(0.5, a / b * 100) : 0;
+
+/* ---------- What's taking space ---------- */
+const SPACE = {root: null, cache: {}, sel: new Set()};
+const TYPE_COLORS = {Photos:"#3b82f6", Videos:"#8b5cf6", Audio:"#f59e0b", Documents:"#22c55e", Apps:"#f43f5e", Archives:"#06b6d4", Other:"#a1a1aa"};
+async function renderSpace(token, force) {
+  const root = SPACE.root && (SPACE.root === HOME || VOLS.some(v => v.path === SPACE.root)) ? SPACE.root : HOME; SPACE.root = root;
+  const key = S.serial + "|" + root; let r = !force && SPACE.cache[key];
+  if (!r || Date.now() - r.fetched > 10 * 60 * 1000) {
+    $("#content").innerHTML = scanBusy("What’s taking space", "Looking through your files…", "spProg");
+    try { r = await runScan("space", root, {}, token, sc => { const el = $("#spProg"); if (el) el.textContent = sc.progress; }); }
+    catch(e) { if (e.message === "cancelled" || S.loadToken !== token) return; $("#content").innerHTML = stateHTML("chart", "Couldn’t check the storage", esc(e.message), `<button class="btn" type="button" id="spRetry">Try again</button>`); $("#spRetry").onclick = () => renderSpace(S.loadToken, true); return; }
+    r.fetched = Date.now(); SPACE.cache[key] = r;
+  }
+  if (S.loadToken !== token) return;
+  SPACE.sel.clear(); drawSpace(r);
+}
+function drawSpace(r) {
+  const maxF = Math.max(1, ...r.folders.map(f => f.bytes));
+  const vol = root => root === HOME ? (S.info && S.info.storage) : (VOLS.find(v => v.path === root) || {}).storage;
+  const st = vol(r.root);
+  $("#content").innerHTML = `<div class="page">
+    <div class="row2"><div><h1>What’s taking space</h1><p class="muted" style="margin:4px 0 0">Scanned ${fmtDate(r.at)}. Save big files to your Mac, then move them to the Trash on the phone.</p></div>
+      <button class="btn" type="button" id="spAgain">Scan again</button></div>
+    ${rootTabs(r.root, "data-sproot")}
+    <section class="panel" aria-labelledby="spTot"><div class="bignum" id="spTot">${fmtSize(r.total)}<small>in ${r.files.toLocaleString()} files${st ? ` · ${fmtSize(st.free)} free of ${fmtSize(st.total)}` : ""}</small></div>
+      <div class="typebar" role="img" aria-label="${esc(r.types.map(t => `${t.type} ${fmtSize(t.bytes)}`).join(", "))}">${r.types.map(t => `<i style="flex:${t.bytes};background:${TYPE_COLORS[t.type]}" title="${esc(t.type)}: ${fmtSize(t.bytes)}"></i>`).join("")}</div>
+      <ul class="legend">${r.types.map(t => `<li><i style="background:${TYPE_COLORS[t.type]}" aria-hidden="true"></i><span>${esc(t.type)}</span><b>${fmtSize(t.bytes)}</b><small>${t.count.toLocaleString()} file${t.count === 1 ? "" : "s"}</small></li>`).join("")}</ul>
+      ${r.trash ? `<p class="note">The Trash holds ${fmtSize(r.trash)} more. <button class="linkbtn" type="button" id="spTrash">Open Trash</button></p>` : ""}</section>
+    <section class="panel" aria-labelledby="spFold"><h2 id="spFold">By folder</h2>
+      <div class="fold">${r.folders.map(f => `<details><summary><span class="fname">${svg("folder")}<span>${esc(f.name)}</span></span><span class="fbar" aria-hidden="true"><i style="width:${pct(f.bytes, maxF)}%"></i></span><b>${fmtSize(f.bytes)}</b></summary>
+        <div class="fkids"><p class="muted">${f.count.toLocaleString()} file${f.count === 1 ? "" : "s"}</p>${f.kids.map(k => `<div class="fkid"><button class="linkbtn" type="button" data-spopen="${esc(k.path)}">${esc(k.name)}</button><span>${fmtSize(k.bytes)}</span></div>`).join("")}
+        <button class="btn" type="button" data-spopen="${esc(f.path)}">Open “${esc(f.name)}”</button></div></details>`).join("")}
+      ${r.loose.count ? `<div class="floose"><span>Files directly in ${esc(rootLabel(r.root))}</span><b>${fmtSize(r.loose.bytes)}</b></div>` : ""}</div></section>
+    <section class="panel" aria-labelledby="spBig"><div class="row2"><h2 id="spBig">Biggest files</h2><span class="muted" id="spSelText" aria-live="polite">Tick files to clean up</span></div>
+      <div class="spbar"><button class="btn primary" type="button" id="spSaveTrash" disabled>Save to Mac, then move to Trash</button><button class="btn" type="button" id="spSave" disabled>Save to Mac</button><button class="btn" type="button" id="spTrashSel" disabled>Move to Trash</button></div>
+      <table><colgroup><col style="width:40px"><col><col style="width:22%"><col style="width:100px"><col style="width:90px"><col style="width:110px"></colgroup>
+      <thead><tr><th class="ck"><input type="checkbox" class="sel" id="spAll" aria-label="Select all"></th><th>Name</th><th>Folder</th><th>Type</th><th class="num">Size</th><th>Modified</th></tr></thead><tbody>
+      ${r.biggest.map((e, i) => `<tr data-sprow="${i}"><td class="ck"><input type="checkbox" class="sel" data-spsel="${i}" aria-label="Select ${esc(e.name)}"></td>
+        <td><span class="name" style="cursor:default"><span class="ico">${svg(kind(e))}</span><span>${esc(e.name)}</span></span></td><td class="where" title="${esc(parentOf(e.path))}">${esc(placeLabel(parentOf(e.path)))}</td><td class="where">${esc(e.type)}</td><td class="num">${fmtSize(e.size)}</td><td class="date">${fmtDate(e.mtime)}</td></tr>`).join("")}</tbody></table></section></div>`;
+  const chosen = () => [...SPACE.sel].sort((a, b) => a - b).map(i => r.biggest[i]);
+  const sync = () => { const l = chosen(), n = l.length, sz = l.reduce((a, e) => a + e.size, 0);
+    $("#spSelText").textContent = n ? `${n} selected · ${fmtSize(sz)}` : "Tick files to clean up";
+    ["spSaveTrash", "spSave", "spTrashSel"].forEach(id => $("#" + id).disabled = !n);
+    document.querySelectorAll("[data-sprow]").forEach(tr => tr.classList.toggle("selected", SPACE.sel.has(+tr.dataset.sprow))); };
+  document.querySelectorAll("[data-spsel]").forEach(b => b.onchange = () => { b.checked ? SPACE.sel.add(+b.dataset.spsel) : SPACE.sel.delete(+b.dataset.spsel); sync(); });
+  $("#spAll").onchange = e => { document.querySelectorAll("[data-spsel]").forEach(b => { b.checked = e.target.checked; e.target.checked ? SPACE.sel.add(+b.dataset.spsel) : SPACE.sel.delete(+b.dataset.spsel); }); sync(); };
+  document.querySelectorAll("[data-sproot]").forEach(b => b.onclick = () => { SPACE.root = b.dataset.sproot; showView("space", true); });
+  document.querySelectorAll("[data-spopen]").forEach(b => b.onclick = () => go(b.dataset.spopen));
+  const again = $("#spTrash"); if (again) again.onclick = () => showView("trash");
+  $("#spAgain").onclick = () => renderSpace(S.loadToken, true);
+  $("#spSave").onclick = () => saveEntries(chosen());
+  $("#spTrashSel").onclick = async () => { await trashEntries(chosen()); delete SPACE.cache[S.serial + "|" + r.root]; };
+  $("#spSaveTrash").onclick = () => saveThenTrash(chosen(), r);
+}
+async function saveThenTrash(list, r) {
+  if (!list.length) return;
+  const n = list.length, sz = fmtSize(list.reduce((a, e) => a + e.size, 0));
+  if (!await confirmDialog(`Save ${n === 1 ? `“${list[0].name}”` : n + " files"} to your Mac, then move to Trash?`,
+    `${sz} is copied to Downloads/Cellar first. Only files that copied without a problem are moved to the Trash on the phone, and you can put them back for 30 days.`, "Save, then move to Trash")) return;
+  try {
+    const job = await postJob({kind:"pull", into:`Large files ${stamp()}`, items: list.map(e => ({path: e.path}))});
+    trackJob(job, async j => {
+      if (j.state === "cancelled") return toast("Cancelled. Nothing was moved to the Trash.");
+      const failed = new Set(j.errors.map(x => x[0])), ok = list.filter(e => !failed.has(e.name));
+      if (failed.size) toast(`${failed.size} file${failed.size > 1 ? "s" : ""} couldn’t be saved, so ${failed.size > 1 ? "they were" : "it was"} left on the phone.`, {err:true});
+      if (!ok.length) return;
+      await trashEntries(ok); delete SPACE.cache[S.serial + "|" + r.root];
+    });
+  } catch(e) { toast(e.message, {err:true}); }
+}
+PAGES.space = renderSpace;
+
+/*__NEWPAGES__*/
 
 /* ---------- init ---------- */
 renderPlaces(); renderDevice(null); renderCrumbs();
