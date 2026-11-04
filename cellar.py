@@ -7,6 +7,7 @@ Requires: python3 (ships with Xcode Command Line Tools) and adb
 Run:      python3 cellar.py
 Nothing leaves your machine; the server listens on 127.0.0.1 only.
 """
+import datetime
 import json
 import mimetypes
 import os
@@ -1238,6 +1239,183 @@ def scan_dupes(sc):
 SCAN_RUNNERS = {"space": scan_space, "dupes": scan_dupes}
 
 
+# ---------------------------------------------------------------- exports: contacts, call history, calendar (and texts)
+
+def content_query(serial, uri, keys, where=None, sort=None, what="that data"):
+    """Runs `content query` on the phone and returns rows as dicts. Explains refusals in plain words."""
+    cmd = f"content query --uri {q(uri)} --projection {q(':'.join(keys))}"
+    if where:
+        cmd += f" --where {q(where)}"
+    if sort:
+        cmd += f" --sort {q(sort)}"
+    out = sh(serial, cmd + " 2>&1", timeout=300)
+    if re.search(r"Permission Denial|SecurityException|Error while accessing provider|Unknown URI|inaccessible", out) and not re.search(r"(?m)^Row: ", out):
+        raise AdbError(f"This phone won't let Cellar read {what}. Some phones block it for apps and computers. "
+                       "On the phone, check Settings › Apps for a permission to allow, or use the phone's own backup app instead.")
+    return parse_rows(out, keys)
+
+
+def parse_rows(out, keys):
+    """Parses `Row: N key=value, key=value` text. Values can hold commas and line breaks, so keys are located in order."""
+    rows, chunks = [], re.split(r"(?m)^Row: \d+ ", out)[1:]
+    for chunk in chunks:
+        chunk = chunk.rstrip("\n")
+        row, pos = {}, 0
+        marks = []
+        for i, k in enumerate(keys):
+            token = f"{k}=" if i == 0 else f", {k}="
+            at = chunk.find(token, pos)
+            marks.append(at)
+            if at >= 0:
+                pos = at + len(token)
+        for i, k in enumerate(keys):
+            if marks[i] < 0:
+                row[k] = ""
+                continue
+            start = marks[i] + (len(k) + 1 if i == 0 else len(k) + 3)
+            nxt = [m for m in marks[i + 1:] if m >= 0]
+            val = chunk[start:nxt[0] if nxt else len(chunk)]
+            row[k] = "" if val == "NULL" else val
+        rows.append(row)
+    return rows
+
+
+def vcard_escape(s):
+    return s.replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
+
+
+def csv_text(header, rows):
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\r\n")
+    w.writerow(header)
+    w.writerows(rows)
+    return "﻿" + buf.getvalue()   # BOM so Numbers and Excel read accents correctly
+
+
+PHONE_TYPES = {"1": "HOME", "2": "CELL", "3": "WORK", "4": "FAX_WORK", "5": "FAX_HOME", "6": "PAGER"}
+MAIL_TYPES = {"1": "HOME", "2": "WORK", "3": "OTHER", "4": "CELL"}
+CALL_TYPES = {"1": "Incoming", "2": "Outgoing", "3": "Missed", "4": "Voicemail", "5": "Rejected", "6": "Blocked"}
+
+
+def export_contacts(serial):
+    keys = ["raw_contact_id", "display_name", "mimetype", "data1", "data2", "data3"]
+    rows = content_query(serial, "content://com.android.contacts/data", keys, what="your contacts")
+    people = {}
+    for r in rows:
+        p = people.setdefault(r["raw_contact_id"], {"name": r["display_name"], "first": "", "last": "", "tel": [], "mail": [], "org": "", "note": "", "adr": []})
+        mt = r["mimetype"].rsplit("/", 1)[-1]
+        if mt == "name":
+            p["first"], p["last"] = r["data2"], r["data3"]
+        elif mt == "phone_v2" and r["data1"]:
+            p["tel"].append((PHONE_TYPES.get(r["data2"], "VOICE"), r["data1"]))
+        elif mt == "email_v2" and r["data1"]:
+            p["mail"].append((MAIL_TYPES.get(r["data2"], "OTHER"), r["data1"]))
+        elif mt == "organization":
+            p["org"] = r["data1"]
+        elif mt == "note":
+            p["note"] = r["data1"]
+        elif mt == "postal-address_v2" and r["data1"]:
+            p["adr"].append(r["data1"])
+    ppl = [p for p in people.values() if p["name"] or p["tel"] or p["mail"]]
+    ppl.sort(key=lambda p: (p["name"] or "").lower())
+    v = []
+    for p in ppl:
+        v += ["BEGIN:VCARD", "VERSION:3.0", f"FN:{vcard_escape(p['name'] or (p['tel'] or [('', '')])[0][1])}",
+              f"N:{vcard_escape(p['last'])};{vcard_escape(p['first'])};;;"]
+        v += [f"TEL;TYPE={t}:{n}" for t, n in p["tel"]] + [f"EMAIL;TYPE={t}:{e}" for t, e in p["mail"]]
+        v += [f"ADR;TYPE=HOME:;;{vcard_escape(a)};;;;" for a in p["adr"]]
+        if p["org"]:
+            v.append(f"ORG:{vcard_escape(p['org'])}")
+        if p["note"]:
+            v.append(f"NOTE:{vcard_escape(p['note'])}")
+        v.append("END:VCARD")
+    csv_rows = [[p["name"], p["first"], p["last"], "; ".join(n for _, n in p["tel"]), "; ".join(e for _, e in p["mail"]), p["org"], p["note"]] for p in ppl]
+    return {"contacts.vcf": "\r\n".join(v) + "\r\n" if v else "",
+            "contacts.csv": csv_text(["Name", "First name", "Last name", "Phones", "Emails", "Company", "Notes"], csv_rows)}, len(ppl)
+
+
+def export_calls(serial):
+    keys = ["number", "name", "type", "date", "duration"]
+    rows = content_query(serial, "content://call_log/calls", keys, sort="date DESC", what="your call history")
+    out = []
+    for r in rows:
+        try:
+            when = datetime.datetime.fromtimestamp(int(r["date"]) / 1000).strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            when = ""
+        out.append([when, r["name"], r["number"], CALL_TYPES.get(r["type"], r["type"]), r["duration"]])
+    return {"call-history.csv": csv_text(["Date", "Name", "Number", "Type", "Duration (seconds)"], out)}, len(out)
+
+
+def ics_escape(s):
+    return s.replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
+
+
+def export_calendar(serial):
+    keys = ["title", "description", "dtstart", "dtend", "eventLocation", "allDay", "rrule", "duration", "eventTimezone", "deleted"]
+    rows = content_query(serial, "content://com.android.calendar/events", keys, what="your calendar")
+    utc = lambda ms: datetime.datetime.fromtimestamp(int(ms) / 1000, datetime.timezone.utc)
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Cellar//Phone export//EN", "CALSCALE:GREGORIAN"]
+    n = 0
+    for i, r in enumerate(rows):
+        if r["deleted"] == "1" or not r["dtstart"].isdigit():
+            continue
+        n += 1
+        ev = ["BEGIN:VEVENT", f"UID:cellar-{i}-{r['dtstart']}@cellar.local", f"DTSTAMP:{datetime.datetime.now(datetime.timezone.utc):%Y%m%dT%H%M%SZ}"]
+        if r["allDay"] == "1":
+            d0 = utc(r["dtstart"]).date()
+            d1 = utc(r["dtend"]).date() if r["dtend"].isdigit() else d0 + datetime.timedelta(days=1)
+            ev += [f"DTSTART;VALUE=DATE:{d0:%Y%m%d}", f"DTEND;VALUE=DATE:{d1:%Y%m%d}"]
+        else:
+            ev.append(f"DTSTART:{utc(r['dtstart']):%Y%m%dT%H%M%SZ}")
+            if r["rrule"] and r["duration"]:
+                ev.append(f"DURATION:{r['duration']}")
+            elif r["dtend"].isdigit():
+                ev.append(f"DTEND:{utc(r['dtend']):%Y%m%dT%H%M%SZ}")
+        if r["rrule"]:
+            ev.append("RRULE:" + r["rrule"])
+        ev.append("SUMMARY:" + ics_escape(r["title"] or "(No title)"))
+        if r["description"]:
+            ev.append("DESCRIPTION:" + ics_escape(r["description"]))
+        if r["eventLocation"]:
+            ev.append("LOCATION:" + ics_escape(r["eventLocation"]))
+        ev.append("END:VEVENT")
+        lines += ev
+    lines.append("END:VCALENDAR")
+    return {"calendar.ics": "\r\n".join(lines) + "\r\n"}, n
+
+
+EXPORTERS = {"contacts": ("Contacts", export_contacts), "calls": ("Call history", export_calls), "calendar": ("Calendar", export_calendar)}
+
+
+def export_dir():
+    return os.path.join(SAVE_DIR, "Exports", datetime.date.today().isoformat())
+
+
+def run_exports(serial, what):
+    folder = export_dir()
+    results = {}
+    for key in what:
+        if key not in EXPORTERS:
+            continue
+        label, fn = EXPORTERS[key]
+        try:
+            files, count = fn(serial)
+            os.makedirs(folder, exist_ok=True)
+            saved = []
+            for name, text in files.items():
+                base, ext = os.path.splitext(name)
+                final = name if not os.path.exists(os.path.join(folder, name)) else keep_both_name(name, set(os.listdir(folder)))
+                with open(os.path.join(folder, final), "w", encoding="utf-8", newline="") as f:
+                    f.write(text)
+                saved.append(final)
+            results[key] = {"label": label, "count": count, "files": saved}
+        except AdbError as e:
+            results[key] = {"label": label, "error": str(e)}
+    return {"folder": folder, "results": results}
+
+
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
@@ -2213,6 +2391,11 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             if sc:
                 sc["_cancel"] = True
             self.send_json({"ok": True})
+        elif R == ("POST", "/api/export"):
+            what = [w for w in self.body_json().get("what", []) if w in EXPORTERS]
+            if not what:
+                raise AdbError("Choose what to export")
+            self.send_json(run_exports(s, what))
         elif R == ("GET", "/api/volumes"):
             self.send_json({"volumes": list_volumes(s)})
         elif R == ("GET", "/api/recent"):

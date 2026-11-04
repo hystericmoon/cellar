@@ -151,5 +151,14 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     ok(fs.readdirSync(R + '/.CellarTrash').some(n => n.endsWith('__dupB.bin')), 'duplicate is in the Cellar Trash');
     fs.unlinkSync(D + '/dupA.bin');
   });
+  await step('export', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=export]');
+    await p.click('#library button[data-lib=export]'); await p.waitForSelector('#exGo');
+    ok(await p.locator('[data-ex]:checked').count() === 3, 'export page offers contacts, calls and calendar');
+    await p.click('#exGo'); await p.waitForSelector('.exlist li', {timeout:20000});
+    ok(await p.locator('.exlist li').count() === 3 && (await p.textContent('.exlist')).includes('2 contacts'), 'export results listed with counts');
+    await p.screenshot({path:__dirname + '/shots/export.png', fullPage:true});
+    ok(fs.readdirSync(process.env.HOME + '/Downloads/Cellar/Exports').length === 1, 'files land in Downloads/Cellar/Exports/<date>');
+  });
   console.log('errors:', errs); await b.close();
 })();

@@ -296,6 +296,7 @@ dialog.small{width:min(520px,94vw)}
 .dpname{flex:1;min-width:0;display:grid}.dpname b{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dpname small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dpwhy{font-size:12.5px;color:var(--muted);min-width:90px;text-align:right}.dupe input:checked~.dpwhy{color:var(--ok);font-weight:600}
 .group legend{font-weight:600;padding:0 6px}.group input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
+.exlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}.exlist li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius)}.exlist span{color:var(--muted);font-size:13px}.exlist .bad{border-color:var(--danger)}.exlist .bad span{color:var(--danger)}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
 </style>
 </head>
@@ -610,11 +611,12 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
 I.check = '<path d="m5 12 5 5 9-10"/>';
+I.contact = '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>';
 I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
@@ -1669,6 +1671,31 @@ function drawDupes(r, key) {
     await trashEntries(l); delete DUPES.cache[key]; };
 }
 PAGES.dupes = renderDupes;
+
+/* ---------- Export contacts, call history, calendar ---------- */
+const EXPORT_ITEMS = [["contacts","Contacts","Saved as .vcf (opens in Contacts on your Mac) and .csv (opens in Numbers or Excel)"],
+  ["calls","Call history","Saved as .csv: date, name, number, type and length of each call"],
+  ["calendar","Calendar","Saved as .ics (opens in Calendar on your Mac)"]];
+async function renderExport() {
+  $("#content").innerHTML = `<div class="page"><h1>Export contacts, calls and calendar</h1>
+    <p class="lead">Makes copies on your Mac. Nothing on the phone is changed.</p>
+    <section class="panel" aria-labelledby="exWhat"><h2 id="exWhat">What to export</h2>
+      ${EXPORT_ITEMS.map(([k, label, sub]) => `<label class="toggle"><input type="checkbox" data-ex="${k}" checked><span><b>${label}</b><small>${sub}</small></span></label>`).join("")}
+      <div class="row2"><span class="muted">Saved in <code>Downloads/Cellar/Exports/${new Date().toLocaleDateString("en-CA")}</code></span><button class="btn primary" type="button" id="exGo">Export</button></div></section>
+    <div id="exResult" aria-live="polite"></div></div>`;
+  $("#exGo").onclick = async () => {
+    const what = [...document.querySelectorAll("[data-ex]:checked")].map(x => x.dataset.ex); if (!what.length) return toast("Tick at least one thing to export.", {err:true});
+    const b = $("#exGo"); b.disabled = true; b.textContent = "Exporting…";
+    try { const r = await postJSON("/api/export", {what}); const all = Object.values(r.results);
+      $("#exResult").innerHTML = `<section class="panel"><h2>Done</h2><ul class="exlist">${what.map(k => { const x = r.results[k]; return x.error
+        ? `<li class="bad"><b>${esc(x.label)}</b><span>${esc(x.error)}</span></li>`
+        : `<li><b>${esc(x.label)}</b><span>${x.count.toLocaleString()} ${k === "calendar" ? "event" : k === "calls" ? "call" : "contact"}${x.count === 1 ? "" : "s"} · ${x.files.map(esc).join(", ")}</span></li>`; }).join("")}</ul>
+        ${all.some(x => !x.error) ? `<div><button class="btn" type="button" id="exShow">Show in Finder</button></div>` : ""}</section>`;
+      const sh = $("#exShow"); if (sh) sh.onclick = () => api("/api/reveal", {path: r.folder}, {method:"POST"}).catch(e => toast(e.message, {err:true}));
+    } catch(e) { toast(e.message, {err:true}); }
+    b.disabled = false; b.textContent = "Export"; };
+}
+PAGES.export = renderExport;
 
 /*__NEWPAGES__*/
 

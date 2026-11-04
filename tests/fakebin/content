@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Pretends to be Android's `content query` with a few contacts, calls, events and texts.
+Touch tests/fakebin/sms_denied (or calendar_denied) to make that provider refuse, like phones that block it."""
+import os, sys
+D = os.path.dirname(os.path.abspath(__file__))
+a = sys.argv[1:]
+if a[:1] != ["query"]: sys.exit(0)
+uri = a[a.index("--uri") + 1]
+proj = a[a.index("--projection") + 1].split(":") if "--projection" in a else None
+where = a[a.index("--where") + 1] if "--where" in a else ""
+
+def emit(rows, default_keys):
+    keys = proj or default_keys
+    if not rows: print("No result found."); return
+    for i, r in enumerate(rows):
+        print(f"Row: {i} " + ", ".join(f"{k}={r.get(k, 'NULL')}" for k in keys))
+
+def deny(what):
+    print(f"java.lang.SecurityException: Permission Denial: opening provider {what} from ProcessRecord (pid=1, uid=2000) requires android.permission.READ_SMS")
+    sys.exit(1)
+
+CT, PH, EM, NM, OR, NOTE = ("vnd.android.cursor.item/contact_name", "vnd.android.cursor.item/phone_v2", "vnd.android.cursor.item/email_v2",
+    "vnd.android.cursor.item/name", "vnd.android.cursor.item/organization", "vnd.android.cursor.item/note")
+if uri == "content://com.android.contacts/data":
+    rows = [
+      dict(raw_contact_id=1, display_name="Ada Lovelace", mimetype=NM, data1="Ada Lovelace", data2="Ada", data3="Lovelace"),
+      dict(raw_contact_id=1, display_name="Ada Lovelace", mimetype=PH, data1="+44 20 7946 0001", data2=2, data3="NULL"),
+      dict(raw_contact_id=1, display_name="Ada Lovelace", mimetype=EM, data1="ada@example.com", data2=1, data3="NULL"),
+      dict(raw_contact_id=1, display_name="Ada Lovelace", mimetype=OR, data1="Analytical Engines, Ltd", data2="NULL", data3="NULL"),
+      dict(raw_contact_id=1, display_name="Ada Lovelace", mimetype=NOTE, data1="Met at the fair; likes maths,\nsecond line", data2="NULL", data3="NULL"),
+      dict(raw_contact_id=2, display_name="Bo Zhang", mimetype=NM, data1="Bo Zhang", data2="Bo", data3="Zhang"),
+      dict(raw_contact_id=2, display_name="Bo Zhang", mimetype=PH, data1="0412 345 678", data2=1, data3="NULL"),
+      dict(raw_contact_id=2, display_name="Bo Zhang", mimetype=PH, data1="0412 999 000", data2=3, data3="NULL"),
+    ]; emit(rows, ["raw_contact_id", "display_name", "mimetype", "data1", "data2", "data3"])
+elif uri == "content://call_log/calls":
+    rows = [dict(number="+442079460001", name="Ada Lovelace", type=1, date=1730000000000, duration=75),
+            dict(number="0412345678", name="Bo Zhang", type=2, date=1730003600000, duration=0),
+            dict(number="+15551234", name="NULL", type=3, date=1730007200000, duration=0)]
+    emit(rows, ["number", "name", "type", "date", "duration"])
+elif uri == "content://com.android.calendar/events":
+    if os.path.exists(D + "/calendar_denied"): deny("com.android.calendar")
+    rows = [dict(title="Dentist, 3rd floor", description="Bring forms;\nreception opens at 9", dtstart=1730109600000, dtend=1730113200000, eventLocation="12 High St", allDay=0, rrule="NULL", duration="NULL", eventTimezone="UTC", deleted=0),
+            dict(title="Holiday", description="NULL", dtstart=1730160000000, dtend=1730246400000, eventLocation="NULL", allDay=1, rrule="NULL", duration="NULL", eventTimezone="UTC", deleted=0),
+            dict(title="Weekly sync", description="NULL", dtstart=1730200000000, dtend="NULL", eventLocation="NULL", allDay=0, rrule="FREQ=WEEKLY;BYDAY=MO", duration="P3600S", eventTimezone="UTC", deleted=0),
+            dict(title="Cancelled", description="NULL", dtstart=1730300000000, dtend=1730303600000, eventLocation="NULL", allDay=0, rrule="NULL", duration="NULL", eventTimezone="UTC", deleted=1)]
+    emit(rows, ["title", "description", "dtstart", "dtend", "eventLocation", "allDay", "rrule", "duration", "eventTimezone", "deleted"])
+elif uri in ("content://sms", "content://mms-sms/conversations") or uri.startswith("content://sms"):
+    if os.path.exists(D + "/sms_denied"): deny("sms")
+    rows = [dict(_id=1, address="+442079460001", date=1730000000000, type=1, body="Hi, are you free tomorrow?", thread_id=1),
+            dict(_id=2, address="+442079460001", date=1730000060000, type=2, body="Yes!\nSee you at 5, bring the \"red\" folder", thread_id=1),
+            dict(_id=3, address="0412345678", date=1730003600000, type=1, body="Parcel delivered", thread_id=2)]
+    emit(rows, ["_id", "address", "date", "type", "body", "thread_id"])
+elif uri == "content://mms":
+    print("No result found.")
+else:
+    print(f"Error while accessing provider:{uri}"); sys.exit(1)
