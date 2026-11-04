@@ -1,6 +1,7 @@
 #!/bin/sh
 case "$1 $2" in
   "list packages") echo "package:/data/app/com.whatsapp-1/base.apk=com.whatsapp versionCode:241"; echo "package:/data/app/org.telegram.messenger-2/base.apk=org.telegram.messenger versionCode:5100";;
+  "query-activities --brief") echo "2 activities found:"; echo "  Activity #0:"; echo "    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true"; echo "    com.google.android.deskclock/com.android.deskclock.HandleSetApiCalls"; echo "  Activity #1:"; echo "    com.sec.android.app.clockpackage/.alarm.ui.activity.AlarmCTSHandleActivity";;
   "path com.whatsapp") echo "package:/data/app/com.whatsapp-1/base.apk";;
   "path org.telegram.messenger") echo "package:/data/app/org.telegram.messenger-2/base.apk"; echo "package:/data/app/org.telegram.messenger-2/split_config.arm64.apk";;
 esac

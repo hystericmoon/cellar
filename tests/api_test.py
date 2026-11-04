@@ -185,6 +185,7 @@ ok("didn't change Do Not Disturb" in r.get("error","") and call("/api/extras")["
 ok("Unknown" in call("/api/dnd","POST",{"mode":"x"}).get("error",""), "unknown DND mode refused")
 open(LOG,"w").close(); r=call("/api/ring","POST",{})
 ok(r.get("at")=="00:00" and "SET_ALARM" in calls() and "extra.alarm.HOUR 0" in calls() and "SKIP_UI true" in calls() and "stream 4" in calls(), f"ring sets a one-time alarm for the next minute (rolls over midnight): {r}")
+ok("am start -p com.google.android.deskclock -a android.intent.action.SET_ALARM" in calls(), "ring targets one Clock app so a phone with two doesn't show a chooser")
 open(FB+"/no_clock","w").close(); r=call("/api/ring","POST",{}); x=call("/api/extras"); os.remove(FB+"/no_clock")
 ok("no Clock app" in r.get("error","") and x["can_ring"] is False, "no Clock app: ring is unavailable and explained")
 # --- step 8: two-way folder sync
