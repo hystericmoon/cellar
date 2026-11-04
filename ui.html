@@ -1634,10 +1634,10 @@ function drawSpace(r) {
       ${r.loose.count ? `<div class="floose"><span>Files directly in ${esc(rootLabel(r.root))}</span><b>${fmtSize(r.loose.bytes)}</b></div>` : ""}</div></section>
     <section class="panel" aria-labelledby="spBig"><div class="row2"><h2 id="spBig">Biggest files</h2><span class="muted" id="spSelText" aria-live="polite">Tick files to clean up</span></div>
       <div class="spbar"><button class="btn primary" type="button" id="spSaveTrash" disabled>Save to Mac, then move to Trash</button><button class="btn" type="button" id="spSave" disabled>Save to Mac</button><button class="btn" type="button" id="spTrashSel" disabled>Move to Trash</button></div>
-      <table><colgroup><col style="width:40px"><col><col style="width:22%"><col style="width:100px"><col style="width:90px"><col style="width:110px"></colgroup>
+      <table><colgroup><col style="width:40px"><col><col style="width:17%"><col style="width:84px"><col style="width:80px"><col style="width:132px"></colgroup>
       <thead><tr><th class="ck"><input type="checkbox" class="sel" id="spAll" aria-label="Select all"></th><th>Name</th><th>Folder</th><th>Type</th><th class="num">Size</th><th>Modified</th></tr></thead><tbody>
       ${r.biggest.map((e, i) => `<tr data-sprow="${i}"><td class="ck"><input type="checkbox" class="sel" data-spsel="${i}" aria-label="Select ${esc(e.name)}"></td>
-        <td><span class="name" style="cursor:default"><span class="ico">${svg(kind(e))}</span><span>${esc(e.name)}</span></span></td><td class="where" title="${esc(parentOf(e.path))}">${esc(placeLabel(parentOf(e.path)))}</td><td class="where">${esc(e.type)}</td><td class="num">${fmtSize(e.size)}</td><td class="date">${fmtDate(e.mtime)}</td></tr>`).join("")}</tbody></table></section></div>`;
+        <td title="${esc(e.name)}"><span class="name" style="cursor:default"><span class="ico">${svg(kind(e))}</span><span>${esc(e.name)}</span></span></td><td class="where" title="${esc(parentOf(e.path))}">${esc(placeLabel(parentOf(e.path)))}</td><td class="where">${esc(e.type)}</td><td class="num">${fmtSize(e.size)}</td><td class="date">${fmtDate(e.mtime)}</td></tr>`).join("")}</tbody></table></section></div>`;
   const chosen = () => [...SPACE.sel].sort((a, b) => a - b).map(i => r.biggest[i]);
   const sync = () => { const l = chosen(), n = l.length, sz = l.reduce((a, e) => a + e.size, 0);
     $("#spSelText").textContent = n ? `${n} selected · ${fmtSize(sz)}` : "Tick files to clean up";
@@ -1692,7 +1692,7 @@ function drawDupes(r, key) {
     <div class="row2"><div><h1>Duplicate files</h1><p class="muted" style="margin:4px 0 0">Files with exactly the same content. Choose the copy to keep in each group. The others go to the Trash, where you can put them back for 30 days.</p></div>
       <button class="btn" type="button" id="dpAgain">Scan again</button></div>
     ${rootTabs(r.root, "data-dproot")}
-    ${r.groups.length ? `<section class="panel"><div class="row2"><div><div class="bignum" id="dpTot">${fmtSize(r.wasted)}<small>wasted by ${r.groups.length} group${r.groups.length === 1 ? "" : "s"} of duplicates</small></div></div>
+    ${r.groups.length ? `<section class="panel"><div class="row2"><div><div class="bignum" id="dpTot">${fmtSize(r.wasted)}<small>wasted by ${(r.total_groups || r.groups.length).toLocaleString()} group${(r.total_groups || r.groups.length) === 1 ? "" : "s"} of duplicates${r.total_groups > r.groups.length ? `. Showing the ${r.groups.length} biggest` : ""}</small></div></div>
       <button class="btn primary" type="button" id="dpGo"></button></div></section>
     ${r.groups.map((g, gi) => `<fieldset class="group"><legend>${esc(g.files[0].name)}<small class="muted"> · ${fmtSize(g.size)} each · ${g.files.length} copies</small></legend>
       ${g.files.map((f, fi) => `<label class="dupe"><input type="radio" name="dp${gi}" value="${fi}" ${fi === (keep[gi] || 0) ? "checked" : ""}>

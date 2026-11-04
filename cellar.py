@@ -1232,7 +1232,7 @@ def scan_dupes(sc):
             fl.sort(key=lambda f: (f["mtime"], len(f["path"])))   # oldest first: the likely original
             out.append({"hash": h, "size": size, "type": type_of(fl[0]["name"]), "files": fl, "wasted": size * (len(fl) - 1)})
     out.sort(key=lambda g: -g["wasted"])
-    return {"root": root, "at": int(time.time()), "scanned": len(rows), "groups": out[:300], "wasted": sum(g["wasted"] for g in out),
+    return {"root": root, "at": int(time.time()), "scanned": len(rows), "groups": out[:300], "wasted": sum(g["wasted"] for g in out), "total_groups": len(out),
             "unchecked": len(files) - len(hashes) if files else 0}
 
 
