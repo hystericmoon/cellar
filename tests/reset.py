@@ -1,6 +1,6 @@
 import os, shutil
 R = "/storage/emulated/0"
-for d in [R + "/Documents", os.path.expanduser("~/Downloads/Cellar"), os.path.expanduser("~/Pictures/Cellar"), R + "/.CellarTrash"]:
+for d in [R + "/Documents", os.path.expanduser("~/Downloads/Cellar"), os.path.expanduser("~/Pictures/Cellar"), R + "/.CellarTrash", "/storage/1A2B-3C4D/.CellarTrash"]:
     if os.path.isdir(d):
         for n in os.listdir(d):
             p = os.path.join(d, n)
@@ -12,6 +12,9 @@ open(R + "/Documents/notes.txt", "w").write("Shopping list")
 open(R + "/Documents/hi.txt", "w").write("hello")
 for f in [os.path.expanduser("~/Library/Application Support/Cellar/" + n) for n in os.listdir(os.path.expanduser("~/Library/Application Support/Cellar")) if n.startswith("backup-")] if os.path.isdir(os.path.expanduser("~/Library/Application Support/Cellar")) else []:
     os.remove(f)
+os.makedirs("/storage/1A2B-3C4D/Documents", exist_ok=True)
+open("/storage/1A2B-3C4D/Documents/sd-notes.txt", "w").write("on the card")
+os.makedirs("/storage/1A2B-3C4D/DCIM/Camera", exist_ok=True)
 print(sorted(os.listdir(R + "/Documents")))
 # test machine only: forget settings (including ones migrated from the old DroidView name)
 for f in ["~/.cellar.json", "~/.droidview.json"]:

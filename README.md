@@ -45,6 +45,14 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 - Screen mirroring with sound, recording, a real-keyboard mode and screen-off mode. It uses scrcpy, which Cellar can download for you.
 - Wi-Fi: Go wireless, or connect with a QR code or pairing code (Android 11+). Cellar reconnects by itself.
 - Screenshots, battery and storage, and switching between multiple phones.
+- SD cards and USB drives show up in the sidebar. Each has its own Trash, search and Recent.
+- What's taking space: storage by file type and folder, the biggest files, and Save to Mac then move to Trash.
+- Duplicates: finds files with identical content, lets you pick the copy to keep, and moves the rest to the Trash.
+- Contacts & calendar: exports contacts (.vcf and .csv), call history (.csv) and calendar (.ics) to `~/Downloads/Cellar/Exports/<date>`.
+- Text messages: saves them as PDF or CSV. Some phones refuse to share messages; Cellar says so. PDF needs Chrome, Edge or Brave on the Mac, otherwise it saves a web page you can print to PDF.
+- Phone camera as a webcam on the Mac (Android 12+, scrcpy 2.2+), from the mirror dialog.
+- Phone controls: ring my phone, music and volume keys, Do Not Disturb. Also in the menu bar. Not every phone supports every one.
+- Sync folders: two-way sync between a Mac folder and a phone folder, with a preview before the first sync. Files changed on both sides are kept as both versions. Replaced or removed files go to the phone's Trash or `~/Downloads/Cellar/Sync versions`, never deleted outright.
 
 ## Where things go
 - Saved files: `~/Downloads/Cellar`

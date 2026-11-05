@@ -24,6 +24,7 @@ swiftc -O -target "$ARCH-apple-macos12.0" \
   -o "$APP/Contents/MacOS/Cellar" Cellar.swift
 
 cp "$ROOT/cellar.py" "$ROOT/ui.html" "$APP/Contents/Resources/"
+cp -R "$ROOT/fonts" "$APP/Contents/Resources/fonts"
 if command -v iconutil >/dev/null 2>&1; then
   iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 fi

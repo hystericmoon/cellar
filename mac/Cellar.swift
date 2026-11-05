@@ -112,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
 
     // MARK: talking to the server
 
-    private func request(_ path: String, method: String = "GET", query: [String: String] = [:], done: ((Any?) -> Void)? = nil) {
+    private func request(_ path: String, method: String = "GET", query: [String: String] = [:], body: [String: Any]? = nil, done: ((Any?) -> Void)? = nil) {
         guard let base = baseURL, var comps = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false) else { done?(nil); return }
         var q = query
         if let s = serial, q["s"] == nil { q["s"] = s }
@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
         req.setValue(token, forHTTPHeaderField: "X-Token")
         if method == "POST" {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = "{}".data(using: .utf8)
+            req.httpBody = body.flatMap { try? JSONSerialization.data(withJSONObject: $0) } ?? "{}".data(using: .utf8)
         }
         req.timeoutInterval = 30
         URLSession.shared.dataTask(with: req) { data, _, _ in
@@ -201,6 +201,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
         let shot = item("Take Screenshot", #selector(takeScreenshot), "")
         shot.isEnabled = connected
         menu.addItem(shot)
+        let controls = NSMenuItem(title: "Phone Controls", action: nil, keyEquivalent: "")
+        let sub = NSMenu(title: "Phone Controls")
+        for (title, sel) in [("Ring My Phone", #selector(ringPhone)), ("Play / Pause", #selector(mediaPlayPause)), ("Next Track", #selector(mediaNext)),
+                             ("Previous Track", #selector(mediaPrevious)), ("Do Not Disturb On", #selector(dndOn)), ("Do Not Disturb Off", #selector(dndOff))] {
+            let i = item(title, sel, "")
+            i.isEnabled = connected
+            sub.addItem(i)
+        }
+        controls.submenu = sub
+        controls.isEnabled = connected
+        menu.addItem(controls)
         menu.addItem(.separator())
         menu.addItem(item("Open Downloads/Cellar", #selector(openSaveFolder), ""))
         if #available(macOS 13.0, *) {
@@ -246,6 +257,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
             }
         }
     }
+
+    // Phone controls. Not every phone supports every one, so failures are explained rather than ignored.
+    private func phoneControl(_ path: String, body: [String: Any]? = nil, done: String? = nil, failTitle: String) {
+        request(path, method: "POST", body: body) { obj in
+            if let d = obj as? [String: Any], let err = d["error"] as? String { self.alert(failTitle, err) }
+            else if let done = done { self.notify(done) }
+        }
+    }
+    @objc private func ringPhone() { phoneControl("api/ring", done: "Ringing in about a minute. Dismiss the alarm on the phone.", failTitle: "Couldn't ring the phone") }
+    @objc private func mediaPlayPause() { phoneControl("api/media", body: ["key": "playpause"], failTitle: "Couldn't control the music") }
+    @objc private func mediaNext() { phoneControl("api/media", body: ["key": "next"], failTitle: "Couldn't control the music") }
+    @objc private func mediaPrevious() { phoneControl("api/media", body: ["key": "previous"], failTitle: "Couldn't control the music") }
+    @objc private func dndOn() { phoneControl("api/dnd", body: ["mode": "priority"], done: "Do Not Disturb is on", failTitle: "Couldn't change Do Not Disturb") }
+    @objc private func dndOff() { phoneControl("api/dnd", body: ["mode": "off"], done: "Do Not Disturb is off", failTitle: "Couldn't change Do Not Disturb") }
 
     @objc private func takeScreenshot() {
         showWindow()
@@ -304,7 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
                              backing: .buffered, defer: false)
             w.title = "Cellar"
             w.titlebarAppearsTransparent = false
-            w.minSize = NSSize(width: 720, height: 480)
+            w.minSize = NSSize(width: 860, height: 480)
             w.contentView = wv
             w.center()
             w.setFrameAutosaveName("CellarMain")
