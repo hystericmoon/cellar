@@ -32,8 +32,8 @@ if uri == "content://com.android.contacts/data":
       dict(contact_id=2, raw_contact_id=2, display_name="Bo Zhang", mimetype=PH, data1="0412 345 678", data2=1, data3="NULL"),
       dict(contact_id=2, raw_contact_id=2, display_name="Bo Zhang", mimetype=PH, data1="0412 999 000", data2=3, data3="NULL"),
       dict(contact_id=3, raw_contact_id=7, display_name="Cy Dee", mimetype=NM, data1="Cy Dee", data2="Cy", data3="Dee"),
-      dict(contact_id=3, raw_contact_id=7, display_name="Cy Dee", mimetype=PH, data1="+62 811-2653-005", data2=2, data3="NULL"),
-      dict(contact_id=3, raw_contact_id=8, display_name="Cy Dee", mimetype=PH, data1="+628112653005", data2=2, data3="NULL"),
+      dict(contact_id=3, raw_contact_id=7, display_name="Cy Dee", mimetype=PH, data1="+62 811-0000-001", data2=2, data3="NULL"),
+      dict(contact_id=3, raw_contact_id=8, display_name="Cy Dee", mimetype=PH, data1="+628110000001", data2=2, data3="NULL"),
       dict(contact_id=3, raw_contact_id=8, display_name="Cy Dee", mimetype=EM, data1="cy@example.com", data2=1, data3="NULL"),
     ]; emit(rows, ["contact_id", "raw_contact_id", "display_name", "mimetype", "data1", "data2", "data3"])
 elif uri == "content://call_log/calls":
