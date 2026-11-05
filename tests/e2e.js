@@ -156,7 +156,7 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.click('#library button[data-lib=export]'); await p.waitForSelector('#exGo');
     ok(await p.locator('[data-ex]:checked').count() === 3, 'export page offers contacts, calls and calendar');
     await p.click('#exGo'); await p.waitForSelector('.exlist li', {timeout:20000});
-    ok(await p.locator('.exlist li').count() === 3 && (await p.textContent('.exlist')).includes('2 contacts'), 'export results listed with counts');
+    ok(await p.locator('.exlist li').count() === 3 && (await p.textContent('.exlist')).includes('3 contacts'), 'export results listed with counts');
     await p.screenshot({path:__dirname + '/shots/export.png', fullPage:true});
     ok(fs.readdirSync(process.env.HOME + '/Downloads/Cellar/Exports').length === 1, 'files land in Downloads/Cellar/Exports/<date>');
   });
