@@ -129,10 +129,11 @@ XD=os.path.expanduser("~/Downloads/Cellar/Exports/"+datetime.date.today().isofor
 r=call("/api/export","POST",{"what":["contacts","calls","calendar"]})
 ok(set(r["results"])=={"contacts","calls","calendar"} and all("error" not in x for x in r["results"].values()), f"export ran {[(k,v.get('count'),v.get('error')) for k,v in r['results'].items()]}")
 vcf=open(XD+"/contacts.vcf",newline="").read()
-ok(vcf.count("BEGIN:VCARD")==2 and "FN:Ada Lovelace" in vcf and "TEL;TYPE=CELL:+44 20 7946 0001" in vcf and "EMAIL;TYPE=HOME:ada@example.com" in vcf and "N:Lovelace;Ada;;;" in vcf, "contacts.vcf has names, phones, emails")
+ok(vcf.count("BEGIN:VCARD")==3 and "FN:Ada Lovelace" in vcf and "TEL;TYPE=CELL:+44 20 7946 0001" in vcf and "EMAIL;TYPE=HOME:ada@example.com" in vcf and "N:Lovelace;Ada;;;" in vcf, "contacts.vcf has names, phones, emails")
 ok("NOTE:Met at the fair\\; likes maths\\,\\nsecond line" in vcf and "ORG:Analytical Engines\\, Ltd" in vcf, "vcard escapes commas, semicolons and line breaks")
 import csv
 rows=list(csv.reader(open(XD+"/contacts.csv",encoding="utf-8-sig",newline=""))); ok(rows[0][0]=="Name" and rows[1][3]=="+44 20 7946 0001" and rows[2][3]=="0412 345 678; 0412 999 000" and "second line" in rows[1][6], "contacts.csv keeps multi-line notes in one cell")
+ok(len(rows)==4 and rows[3][0]=="Cy Dee" and rows[3][3]=="+62 811-2653-005" and rows[3][4]=="cy@example.com", f"one contact stored under two accounts exports once, numbers and emails merged {rows[3]}")
 calls=list(csv.reader(open(XD+"/call-history.csv",encoding="utf-8-sig",newline=""))); ok(len(calls)==4 and calls[1][3]=="Incoming" and calls[2][3]=="Outgoing" and calls[3][3]=="Missed" and calls[1][4]=="75", f"call history csv {calls[1]}")
 ok(cm.sheet_safe("628123456789")=="6281 2345 6789" and cm.sheet_safe("085729571234")=="0857 2957 1234" and cm.sheet_safe("+6281234567890")=="+6281 2345 6789 0" and cm.sheet_safe("+62 815-1135-5600")=="+62 815-1135-5600" and cm.sheet_safe("=1+1")=="'=1+1" and cm.sheet_safe("Hello")=="Hello", "CSV: bare phone numbers stay text in spreadsheets, formula-looking cells are neutralised")
 ics=open(XD+"/calendar.ics",newline="").read()

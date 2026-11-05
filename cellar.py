@@ -1315,22 +1315,26 @@ CALL_TYPES = {"1": "Incoming", "2": "Outgoing", "3": "Missed", "4": "Voicemail",
 
 
 def export_contacts(serial):
-    keys = ["raw_contact_id", "display_name", "mimetype", "data1", "data2", "data3"]
+    keys = ["contact_id", "raw_contact_id", "display_name", "mimetype", "data1", "data2", "data3"]
     rows = content_query(serial, "content://com.android.contacts/data", keys, what="your contacts")
     people = {}
     for r in rows:
-        p = people.setdefault(r["raw_contact_id"], {"name": r["display_name"], "first": "", "last": "", "tel": [], "mail": [], "org": "", "note": "", "adr": []})
+        # one person can be stored under several accounts (two Google accounts, WhatsApp); Android joins them by contact_id
+        p = people.setdefault(r.get("contact_id") or r["raw_contact_id"], {"name": r["display_name"], "first": "", "last": "", "tel": [], "mail": [], "org": "", "note": "", "adr": []})
         mt = r["mimetype"].rsplit("/", 1)[-1]
         if mt == "name":
-            p["first"], p["last"] = r["data2"], r["data3"]
+            if not p["first"] and not p["last"]:
+                p["first"], p["last"] = r["data2"], r["data3"]
         elif mt == "phone_v2" and r["data1"]:
-            p["tel"].append((PHONE_TYPES.get(r["data2"], "VOICE"), r["data1"]))
+            if re.sub(r"\D", "", r["data1"]) not in [re.sub(r"\D", "", n) for _, n in p["tel"]]:
+                p["tel"].append((PHONE_TYPES.get(r["data2"], "VOICE"), r["data1"]))
         elif mt == "email_v2" and r["data1"]:
-            p["mail"].append((MAIL_TYPES.get(r["data2"], "OTHER"), r["data1"]))
+            if r["data1"].lower() not in [e.lower() for _, e in p["mail"]]:
+                p["mail"].append((MAIL_TYPES.get(r["data2"], "OTHER"), r["data1"]))
         elif mt == "organization":
-            p["org"] = r["data1"]
+            p["org"] = p["org"] or r["data1"]
         elif mt == "note":
-            p["note"] = r["data1"]
+            p["note"] = p["note"] or r["data1"]
         elif mt == "postal-address_v2" and r["data1"]:
             p["adr"].append(r["data1"])
     ppl = [p for p in people.values() if p["name"] or p["tel"] or p["mail"]]
