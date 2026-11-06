@@ -4,34 +4,79 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cellar</title>
+<script>
+// Appearance, applied before first paint. Settings live in localStorage (dv-theme, dv-matchos, dv-glass, dv-kind).
+window.APPEARANCE = (function () {
+  const de = document.documentElement, get = k => { try { return localStorage.getItem("dv-" + k); } catch (e) { return null; } };
+  const inApp = new URLSearchParams(location.search).has("app"), mq = matchMedia("(prefers-color-scheme: dark)");
+  function apply() {
+    const chosen = get("theme") || "graphite", match = get("matchos") === "1";
+    de.dataset.theme = match && !mq.matches ? "daylight" : (match && chosen === "daylight" ? "graphite" : chosen);
+    de.classList.toggle("glass", get("glass") !== "0");
+    de.classList.toggle("nokind", get("kind") === "0");
+    de.classList.toggle("in-app", inApp);
+  }
+  apply(); mq.addEventListener("change", apply);
+  return { apply, inApp };
+})();
+</script>
 <style>
 /*__GEIST__*/
-:root{
-  /* shadcn/ui look (zinc), ported as plain CSS tokens */
-  --bg:#fafafa;--panel:#fff;--text:#09090b;--muted:#71717a;--line:#e4e4e7;--hover:#f4f4f5;
-  --accent:#18181b;--accent-ink:#fafafa;--accent-soft:#f4f4f5;--ok:#15803d;--warn:#b45309;--danger:#dc2626;
-  --ring:#18181b;--radius:8px;--shadow:0 1px 2px rgba(9,9,11,.05),0 10px 30px rgba(9,9,11,.10);
-  color-scheme:light dark;
+/* Themes. Graphite is the default; the head script sets data-theme from Settings › Appearance.
+   --bg ground · --side sidebar · --panel cards · --raised controls · --hover rows · --line borders
+   --accent primary fill · --accent-ink text on it · --accent-soft selected fill · --accent-text links
+   --k-* colour by kind (Camera violet, Pictures pink, Downloads amber, Movies orange, Music green,
+   Documents lime, apps teal, sync sky), lighter on dark themes and darker on Daylight. */
+:root,:root[data-theme="graphite"]{
+  --bg:#111111;--side:#0c0c0c;--panel:#161616;--raised:#1c1c1c;--hover:#1f1f1f;--line:#2e2e2e;--line-strong:#474747;
+  --text:#f5f5f5;--muted:#a8a8a8;--accent:#ececec;--accent-ink:#111111;--accent-soft:#262626;--accent-text:#ffffff;
+  --ok:#4ade80;--warn:#fbbf24;--danger:#f87171;--ring:#ececec;--glow:rgba(255,255,255,.07);
+  --radius:10px;--shadow:0 1px 2px rgba(0,0,0,.5),0 12px 32px rgba(0,0,0,.55);color-scheme:dark;
+  --k-violet:#c084fc;--k-pink:#f472b6;--k-amber:#fbbf24;--k-orange:#fb923c;--k-green:#34d399;--k-lime:#a3e635;--k-teal:#2dd4bf;--k-sky:#38bdf8;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:#09090b;--panel:#0f0f12;--text:#fafafa;--muted:#a1a1aa;--line:#27272a;--hover:#1c1c20;
-  --accent:#fafafa;--accent-ink:#18181b;--accent-soft:#232326;--ok:#4ade80;--warn:#fbbf24;--danger:#f87171;
-  --ring:#fafafa;--shadow:0 1px 2px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.6);
-}}
+:root[data-theme="violet"]{--bg:#120f17;--side:#0f0d13;--panel:#15121b;--raised:#1a1622;--hover:#1c1826;--line:#2f293a;--line-strong:#4a3f5e;
+  --text:#f5f3f7;--muted:#a8a2b3;--accent:#9333ea;--accent-ink:#ffffff;--accent-soft:#1d1529;--accent-text:#d8b4fe;--ring:#c084fc;--glow:rgba(168,85,247,.14)}
+:root[data-theme="midnight"]{--bg:#0d1117;--side:#0a0e14;--panel:#11161f;--raised:#161c27;--hover:#18202c;--line:#263041;--line-strong:#3a4a63;
+  --text:#f3f6fa;--muted:#9ea9b8;--accent:#2563eb;--accent-ink:#ffffff;--accent-soft:#101c33;--accent-text:#93c5fd;--ring:#60a5fa;--glow:rgba(59,130,246,.16)}
+:root[data-theme="forest"]{--bg:#0e1311;--side:#0b0f0d;--panel:#121916;--raised:#17201c;--hover:#19231f;--line:#27352f;--line-strong:#3a4d44;
+  --text:#f2f7f4;--muted:#9fb0a8;--accent:#15803d;--accent-ink:#ffffff;--accent-soft:#10241a;--accent-text:#86efac;--ring:#4ade80;--glow:rgba(34,197,94,.14)}
+:root[data-theme="ember"]{--bg:#14100e;--side:#100c0a;--panel:#1a1512;--raised:#211a16;--hover:#231c18;--line:#3a2e27;--line-strong:#54443a;
+  --text:#faf5f2;--muted:#b3a69d;--accent:#c2410c;--accent-ink:#ffffff;--accent-soft:#2a170d;--accent-text:#fdba74;--ring:#fb923c;--glow:rgba(249,115,22,.14)}
+:root[data-theme="daylight"]{--bg:#faf9fc;--side:#f3f1f6;--panel:#ffffff;--raised:#f6f4f9;--hover:#f1edf6;--line:#e4e0ea;--line-strong:#c9bfd8;
+  --text:#17141c;--muted:#5f5868;--accent:#7e22ce;--accent-ink:#ffffff;--accent-soft:#f3e9fd;--accent-text:#7e22ce;--ring:#7e22ce;--glow:rgba(168,85,247,.10);
+  --ok:#15803d;--warn:#b45309;--danger:#dc2626;--shadow:0 1px 2px rgba(23,20,28,.06),0 12px 32px rgba(23,20,28,.12);color-scheme:light;
+  --k-violet:#9333ea;--k-pink:#db2777;--k-amber:#d97706;--k-orange:#ea580c;--k-green:#059669;--k-lime:#65a30d;--k-teal:#0d9488;--k-sky:#0284c7}
+.k-violet{--k:var(--k-violet)}.k-pink{--k:var(--k-pink)}.k-amber{--k:var(--k-amber)}.k-orange{--k:var(--k-orange)}
+.k-green{--k:var(--k-green)}.k-lime{--k:var(--k-lime)}.k-teal{--k:var(--k-teal)}.k-sky{--k:var(--k-sky)}
+html.nokind :is(.k-violet,.k-pink,.k-amber,.k-orange,.k-green,.k-lime,.k-teal,.k-sky){--k:var(--muted)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:14px/1.45 "Geist","Geist Sans",-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
-.app{display:grid;grid-template-columns:264px 1fr;height:100vh}
-aside{background:var(--panel);border-right:1px solid var(--line);padding:20px 14px;overflow:auto;display:flex;flex-direction:column;gap:22px}
-.brand{display:flex;align-items:center;gap:10px;padding:0 6px;font-weight:650;font-size:15px;letter-spacing:-.01em}
-.brand .logo{width:28px;height:28px;border-radius:var(--radius);background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
-.label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0 8px;margin:0 0 6px}
-.device{border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:grid;gap:12px}
+.app{display:grid;grid-template-columns:248px 1fr;height:100vh}
+aside{background:var(--side);border-right:1px solid var(--line);padding:16px 10px 12px;overflow:auto;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 14px;font-weight:600;font-size:15px;letter-spacing:-.01em}
+.brand .logo{width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.label{font-size:12px;font-weight:500;color:var(--muted);padding:0 8px;margin:0 0 6px}
+.devrow{width:100%;display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--panel);text-align:left;cursor:pointer}
+.devrow:hover{border-color:var(--line-strong)}
+.devrow .dot{width:8px;height:8px;border-radius:99px;background:var(--muted);flex:none}.devrow .dot.on{background:var(--ok)}
+.devrow .t{flex:1;min-width:0;display:grid}.devrow b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.devrow small{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.devrow .chev{width:14px;height:14px;color:var(--muted);transition:transform .15s}.devrow[aria-expanded="true"] .chev{transform:rotate(180deg)}
+#deviceBox{margin-bottom:10px}
+.device{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;margin:-6px 0 0;padding:14px 10px 10px;display:grid;gap:10px;background:var(--panel)}
+.devrow[aria-expanded="true"]{border-radius:10px 10px 0 0}
 .device h2{margin:0;font-size:15px;font-weight:620;letter-spacing:-.01em}
 .device .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.grp{display:flex;align-items:center;gap:6px;width:100%;height:24px;margin:12px 0 2px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--muted);font-size:12px;text-align:left;cursor:pointer}
+.grp:hover{color:var(--text)}.grp svg{width:12px;height:12px;transition:transform .15s;flex:none}.grp[aria-expanded="true"] svg{transform:rotate(90deg)}
+.grp .n{margin-left:auto;font-variant-numeric:tabular-nums}.grp[aria-expanded="true"] .n{display:none}
+.grp.droptarget{background:var(--accent-soft);color:var(--text)}
+.pinhint{margin:2px 8px 0;font-size:12px;color:var(--muted)}
+aside .spacer{flex:1;min-height:12px}
 .meter{display:grid;gap:5px;font-size:12.5px}
 .meter .row{display:flex;justify-content:space-between;color:var(--muted)}
 .meter .row b{color:var(--text);font-weight:560}
@@ -40,12 +85,13 @@ aside{background:var(--panel);border-right:1px solid var(--line);padding:20px 14
 .bar i.low{background:var(--danger)}
 select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
 nav ul{list-style:none;margin:0;padding:0;display:grid;gap:1px}
-nav button{width:100%;display:flex;align-items:center;gap:10px;padding:7px 8px;border:0;background:none;border-radius:7px;text-align:left;cursor:pointer;color:var(--text)}
-nav button:hover{background:var(--hover)}
-nav button[aria-current="true"]{background:var(--hover);color:var(--text);font-weight:600;box-shadow:inset 2px 0 0 var(--accent)}
-nav svg{width:16px;height:16px;flex:none;opacity:.85}
-.foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 8px}
-.foot button{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+nav li>button{width:100%;display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border:0;background:none;border-radius:8px;text-align:left;cursor:pointer;color:var(--text);opacity:.86}
+nav li>button:hover{background:var(--hover);opacity:1}
+nav li>button[aria-current="true"]{background:var(--accent-soft);opacity:1;font-weight:500}
+nav li>button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+nav li>button .badge{margin-left:auto;font-size:12px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+nav svg{width:16px;height:16px;flex:none}
+nav li>button svg{color:var(--k,currentColor)}
 main{display:flex;flex-direction:column;min-width:0;position:relative}
 .toolbar{display:flex;align-items:center;gap:8px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
 .crumbs{display:flex;align-items:center;gap:2px;min-width:0;flex:1;overflow:hidden;white-space:nowrap}
@@ -58,6 +104,8 @@ main{display:flex;flex-direction:column;min-width:0;position:relative}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:560}
 .btn.primary:hover{filter:none;opacity:.88}
 .btn.icon{width:32px;padding:0;justify-content:center}
+@media (max-width:1180px){.btn .lbl{display:none}.btn:has(.lbl){width:32px;padding:0;justify-content:center}}
+@media (max-width:1040px){.search input{width:140px}.crumbs{min-width:96px}.toolbar{gap:6px;padding:12px 14px}}
 .btn svg{width:16px;height:16px}
 .btn:disabled{opacity:.45;cursor:default}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -81,16 +129,25 @@ td.date{color:var(--muted);font-variant-numeric:tabular-nums}
 .ico{width:28px;height:28px;flex:none;border-radius:7px;display:grid;place-items:center;background:var(--hover);color:var(--muted)}
 .ico svg{width:16px;height:16px}
 .ico.folder{background:var(--hover);color:var(--text)}
+.ico[class*=" k-"]{color:var(--k);background:color-mix(in srgb,var(--k) 14%,transparent)}
+html.nokind .ico[class*=" k-"]{background:var(--hover)}
 td.act{text-align:right;overflow:visible;padding-right:6px}
 .rowact{opacity:0;transition:opacity .12s;height:28px;font-size:13px}
 tr:hover .rowact,tr:focus-within .rowact{opacity:1}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:12px 8px}
-.tile{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:0;cursor:pointer;overflow:hidden;text-align:left;display:flex;flex-direction:column}
-.tile:hover{border-color:var(--muted)}
+.tile{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:0;cursor:pointer;overflow:hidden;text-align:left;display:flex;flex-direction:column;transition:border-color .2s,background-color .2s}
+.tile:hover{border-color:var(--line-strong);background:radial-gradient(220px circle at var(--mx,30%) var(--my,0%),var(--tglow,var(--glow)),transparent 70%),var(--panel)}
+.tile[class*=" k-"]{--tglow:color-mix(in srgb,var(--k) 16%,transparent)}
+.thumb.folder svg{color:var(--k,var(--text));fill:color-mix(in srgb,var(--k,transparent) 14%,transparent)}
+.tile[class*=" k-"] .thumb:not(.folder) svg{color:var(--k)}
+.tile[class*=" k-"] .thumb:not(.folder):not(:has(img)){background:color-mix(in srgb,var(--k) 10%,var(--hover))}
+.tilewrap.hiddenf .tile{opacity:.6}
 .thumb{aspect-ratio:1;background:var(--hover);display:grid;place-items:center;color:var(--muted);overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb svg{width:34px;height:34px}
-.thumb.folder{background:var(--hover);color:var(--text);aspect-ratio:auto;height:84px}
+.thumb.folder{background:none;color:var(--text);aspect-ratio:auto;height:auto;place-items:start;padding:14px 12px 0}
+.thumb.folder svg{width:24px;height:24px}
+.tile:has(.thumb.folder) .cap{padding-top:8px}
 @keyframes shim{to{background-position:-200% 0}}
 .thumb:has(img){background:linear-gradient(100deg,var(--hover) 40%,var(--accent-soft) 50%,var(--hover) 60%) 0 0/200% 100%;animation:shim 1.6s linear infinite}
 @media (prefers-reduced-motion:reduce){.thumb:has(img){animation:none}}
@@ -262,10 +319,38 @@ dialog.small{width:min(520px,94vw)}
 .toggle span{display:grid;gap:2px}
 .toggle b{font-weight:560}
 .toggle small{color:var(--muted);font-size:12.5px}
-.page{max-width:880px;margin:0 auto;padding:22px 16px 60px;display:grid;gap:18px}
-.page h1{font-size:22px;letter-spacing:-.02em;margin:0}
+.page{max-width:1120px;margin:0 auto;padding:24px 20px 60px;display:grid;gap:16px}
+.page h1{font-size:24px;line-height:32px;letter-spacing:-.01em;font-weight:600;margin:0}
 .page .lead{color:var(--muted);margin:-10px 0 0}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:14px;align-content:start}
+.cols2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}.cols2>div{display:grid;gap:16px}
+.cols3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}.cols3>.span2{grid-column:span 2}
+@media (max-width:980px){.cols2,.cols3{grid-template-columns:1fr}.cols3>.span2{grid-column:auto}}
+.media6{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.media6 .btn{flex-direction:column;height:auto;padding:12px 6px;gap:6px;font-size:13px;justify-content:center}.media6 .btn svg{width:18px;height:18px}
+.finding{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px 12px 18px;border-radius:14px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line))}
+.finding p{margin:0;font-size:15px}.finding b{font-weight:600}
+.sbar{display:flex;gap:2px;height:12px;border-radius:99px;overflow:hidden;background:var(--hover)}.sbar i{display:block;min-width:3px}
+.qa{display:grid;gap:2px;padding:12px 8px 8px}.qa h2{margin:0 8px 6px}
+.qa button{display:grid;gap:1px;width:100%;padding:9px 8px;border:0;border-radius:10px;background:none;text-align:left;cursor:pointer}.qa button:hover{background:var(--hover)}
+.qa b{font-weight:500}.qa small{color:var(--muted);font-size:13px}
+.shots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.shots button{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--hover);overflow:hidden;padding:0;cursor:pointer;display:grid;place-items:center;color:var(--muted)}
+.shots img{width:100%;height:100%;object-fit:cover;display:block}.shots svg{width:22px;height:22px}
+.rlist{list-style:none;margin:0;padding:0;display:grid}.rlist button{display:flex;align-items:center;gap:10px;width:100%;padding:6px 4px;border:0;border-radius:8px;background:none;text-align:left;cursor:pointer;min-width:0}
+.rlist button:hover{background:var(--hover)}.rlist .t{flex:1;min-width:0;display:grid}.rlist b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rlist small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phead{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.phead h2{margin:0}
+.themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.theme{display:grid;gap:10px;padding:8px 8px 12px;border-radius:14px;border:2px solid var(--line);background:var(--panel);text-align:left;cursor:pointer;transition:transform .12s,border-color .15s}
+.theme:hover{transform:translateY(-2px)}.theme[aria-checked="true"]{border-color:var(--accent)}
+.theme .pv{display:flex;height:96px;border-radius:9px;overflow:hidden;border:1px solid}
+.theme .pv>span:first-child{width:30%;display:grid;align-content:start;gap:6px;padding:10px 8px}
+.theme .pv>span:last-child{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px}
+.theme .pv i{display:block;height:5px;border-radius:3px}
+.theme b{font-weight:600;padding:0 4px}.theme small{color:var(--muted);font-size:13px;padding:0 4px;margin-top:-8px}
+@media (max-width:980px){.themes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.subtabs{display:flex;gap:4px}.subtabs button{height:30px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:none;cursor:pointer;color:var(--muted)}
+.subtabs button[aria-current="true"]{background:var(--accent-soft);border-color:var(--line-strong);color:var(--text)}
 .panel h2{margin:0;font-size:15px}
 .bignum{font-size:28px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .bignum small{font-size:14px;color:var(--muted);font-weight:400;margin-left:6px}
@@ -315,6 +400,24 @@ dialog.small{width:min(520px,94vw)}
 .pvlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}.pvlist summary{cursor:pointer;padding:4px 0}.pvlist details ul{max-height:220px;overflow:auto;margin:4px 0 8px;padding-left:22px;font-size:13px}
 .browse{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:grid;gap:8px}.browse ul{list-style:none;margin:0;padding:0;max-height:200px;overflow:auto;display:grid;gap:2px}.browse .linkbtn{text-decoration:none;display:flex;align-items:center;gap:8px;padding:4px 2px}.browse .linkbtn svg{width:16px;height:16px;color:var(--muted)}
 .group{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;display:grid;gap:8px}
+
+/* ---------- Liquid Glass ----------
+   html.glass: floating surfaces (menus, dialogs, toasts, transfers, the selection bar) turn to frosted glass.
+   html.in-app: running inside the Mac app, whose window has a native glass background (NSGlassEffectView on
+   macOS 26+, vibrancy before) and a transparent title bar. With glass on, the sidebar lets it show through. */
+html.glass :is(#ctxmenu,#transfers,.selbar,dialog,.toast:not(.err)){
+  background:color-mix(in srgb,var(--panel) 68%,transparent);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  border-color:color-mix(in srgb,var(--text) 14%,transparent);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 12%,transparent),var(--shadow)}
+html.glass .toast:not(.err){color:var(--text)}
+html.glass dialog::backdrop{background:rgba(0,0,0,.35);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+html.glass dialog .dbody{background:color-mix(in srgb,var(--bg) 70%,transparent)}
+html.in-app aside{padding-top:46px}
+html.in-app.glass,html.in-app.glass body{background:transparent}
+html.in-app.glass aside{background:color-mix(in srgb,var(--side) 38%,transparent);border-right-color:color-mix(in srgb,var(--text) 10%,transparent)}
+html.in-app.glass aside .devrow,html.in-app.glass aside .device{background:color-mix(in srgb,var(--panel) 55%,transparent)}
+html.in-app.glass main{background:var(--bg)}
 </style>
 </head>
 <body>
@@ -322,10 +425,12 @@ dialog.small{width:min(520px,94vw)}
   <aside aria-label="Device and places">
     <div class="brand"><span class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg></span>Cellar</div>
     <section id="deviceBox" aria-live="polite"></section>
-    <nav aria-label="Places"><p class="label">Places</p><ul id="places"></ul></nav>
-    <nav aria-label="Library"><p class="label">Library</p><ul id="library"></ul></nav>
-    <div class="foot">Saved files go to<br><button id="revealBtn" type="button">~/Downloads/Cellar</button>
-      <button class="btn full quiet" id="settingsBtn" type="button" style="margin-top:10px;justify-content:flex-start;padding:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button></div>
+    <nav aria-label="Cellar" id="sidenav">
+      <ul id="homeNav"></ul>
+      <button type="button" class="grp" data-grp="places" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>Favorites<span class="n"></span></button>
+      <ul id="places" data-grpbody="places"></ul>
+      <div id="library"></div>
+    </nav>
   </aside>
   <main>
     <div class="toolbar">
@@ -336,9 +441,9 @@ dialog.small{width:min(520px,94vw)}
         <button type="button" data-view="list" aria-label="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
         <button type="button" data-view="grid" aria-label="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
       </div>
-      <button class="btn icon" id="newFolderBtn" type="button" aria-label="New folder" title="New folder (⌥⌘N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/></svg></button>
-      <button class="btn icon" id="shotBtn" type="button" aria-label="Take a screenshot of the phone" title="Screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg></button>
-      <button class="btn icon" id="mirrorBtn" type="button" aria-label="Mirror the phone screen on your Mac" title="Mirror screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="14" height="10" rx="2"/><rect x="17" y="8" width="5" height="12" rx="1.5"/><path d="M6 18h6"/></svg></button>
+      <button class="btn" id="newFolderBtn" type="button" aria-label="New folder" title="New folder (⌥⌘N)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 10v6M9 13h6"/></svg><span class="lbl">New folder</span></button>
+      <button class="btn" id="shotBtn" type="button" aria-label="Take a screenshot of the phone" title="Screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h2M17 4h2a2 2 0 0 1 2 2v2M21 16v2a2 2 0 0 1-2 2h-2M7 20H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg><span class="lbl">Screenshot</span></button>
+      <button class="btn" id="mirrorBtn" type="button" aria-label="Mirror the phone screen on your Mac" title="Mirror screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="14" height="10" rx="2"/><rect x="17" y="8" width="5" height="12" rx="1.5"/><path d="M6 18h6"/></svg><span class="lbl">Mirror</span></button>
       <button class="btn primary" id="addBtn" type="button" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>Add<span aria-hidden="true" style="margin-left:2px;opacity:.8">▾</span></button>
       <input type="file" id="fileInput" multiple hidden>
       <input type="file" id="folderInput" webkitdirectory multiple hidden>
@@ -390,14 +495,6 @@ dialog.small{width:min(520px,94vw)}
 <dialog id="mirror" aria-labelledby="mrTitle" class="small">
   <div class="dhead"><h2 id="mrTitle">Mirror the phone screen</h2><button class="btn icon" type="button" id="mrClose" aria-label="Close">✕</button></div>
   <div class="cbody" id="mrBody"></div>
-</dialog>
-<dialog id="settings" aria-labelledby="stTitle" class="small">
-  <div class="dhead"><h2 id="stTitle">Settings</h2><button class="btn icon" type="button" id="stClose" aria-label="Close">✕</button></div>
-  <div class="cbody">
-    <label class="toggle"><input type="checkbox" id="stFinder"><span><b>Show the phone in Finder when it connects</b><small>It appears under Locations, so Finder's own copy, paste and drag work.</small></span></label>
-    <label class="toggle"><input type="checkbox" id="stNotify"><span><b>Notifications</b><small>Tell me when long transfers and backups finish.</small></span></label>
-    <p class="muted" style="font-size:12.5px">Shortcuts: ⌘C copy · ⌘X cut · ⌘V paste · ⌥⌘V move here · ⌘⌫ Trash · ⌘Z undo · F2 rename · ⌘D duplicate · ⌥⌘N new folder · Space preview · ⌘F search</p>
-  </div>
 </dialog>
 <dialog id="wifi" aria-labelledby="wTitle">
   <div class="dhead"><h2 id="wTitle">Connect over Wi-Fi</h2><button class="btn icon" type="button" id="wClose" aria-label="Close">✕</button></div>
@@ -482,10 +579,24 @@ const kind = e => { if (e.dir) return "folder"; const x = e.name.includes(".") ?
   for (const k in EXT) if (EXT[k].split(" ").includes(x)) return k; return "file"; };
 const previewable = e => ["image","video","audio","text","pdf"].includes(kind(e));
 
-const PLACE_DEFS = [["Internal storage",[""],"home"],["Camera",["DCIM/Camera"],"camera"],["Screenshots",["Pictures/Screenshots","DCIM/Screenshots"],"image"],
+const PLACE_DEFS = [["Internal storage",[""],"phone"],["Camera",["DCIM/Camera"],"camera"],["Screenshots",["Pictures/Screenshots","DCIM/Screenshots"],"image"],
   ["Pictures",["Pictures"],"image"],["Downloads",["Download"],"download"],["Documents",["Documents"],"text"],
   ["Music",["Music"],"audio"],["Movies",["Movies"],"video"],["WhatsApp media",["Android/media/com.whatsapp/WhatsApp/Media","WhatsApp/Media"],"folder"]];
+// Shown in Favorites until removed; the other places appear once pinned (right-click a folder › Add to sidebar).
+const DEFAULT_FAVS = new Set(["Internal storage", "Camera", "Pictures", "Downloads", "Documents"]);
 let PLACES = PLACE_DEFS.map(([l, rels, ic]) => [l, rels[0], ic]);
+const jget = (k, d) => { try { return JSON.parse(store.get(k)) || d; } catch(e) { return d; } };
+const PINS = { get added() { return jget("pins", []); }, get removed() { return jget("unpins", []); },
+  has(p) { const d = PLACES.find(x => (x[1] ? HOME + "/" + x[1] : HOME) === p);
+    return this.added.includes(p) || (!!d && DEFAULT_FAVS.has(d[0]) && !this.removed.includes(p)); },
+  add(p) { store.set("pins", JSON.stringify([...new Set([...this.added, p])])); store.set("unpins", JSON.stringify(this.removed.filter(x => x !== p))); renderPlaces(); toast(`Added “${placeLabel(p)}” to the sidebar`); },
+  remove(p) { store.set("pins", JSON.stringify(this.added.filter(x => x !== p))); store.set("unpins", JSON.stringify([...new Set([...this.removed, p])])); renderPlaces(); } };
+// Colour by kind: one hue per kind of file, shared by folders, file icons, the sidebar and Home.
+const KIND_HUE = {image:"k-pink", video:"k-orange", audio:"k-green", text:"k-lime", pdf:"k-lime", archive:"k-amber", apk:"k-teal"};
+const FOLDER_HUE = {dcim:"k-violet", camera:"k-violet", pictures:"k-pink", screenshots:"k-pink", download:"k-amber", downloads:"k-amber",
+  movies:"k-orange", music:"k-green", ringtones:"k-green", notifications:"k-green", alarms:"k-green", podcasts:"k-green", audiobooks:"k-green",
+  recordings:"k-green", documents:"k-lime", android:"k-teal", "sync to drive":"k-sky", whatsapp:"k-green", "whatsapp media":"k-green"};
+const hueOf = e => e.dir ? (FOLDER_HUE[e.name.toLowerCase()] || "") : (KIND_HUE[kind(e)] || "");
 let VOLS = [];   // SD cards and USB drives: {path, name, storage}
 const rootOf = p => (VOLS.find(v => p === v.path || p.startsWith(v.path + "/")) || {}).path || HOME;
 const rootLabel = r => r === HOME ? "Internal storage" : ((VOLS.find(v => v.path === r) || {}).name || baseName(r));
@@ -557,18 +668,22 @@ async function refreshDevices() {
   } catch(e) { /* server gone */ }
 }
 function pollDevices() { refreshDevices().finally(() => setTimeout(pollDevices, 3000)); }
-async function loadInfo() { resolvePlaces(); try { S.info = await api("/api/info"); } catch(e) { S.info = null; } renderDevice(S.info); }
+async function loadInfo() { resolvePlaces(); try { S.info = await api("/api/info"); } catch(e) { S.info = null; } renderDevice(S.info);
+  api("/api/backup").then(b => { S.backupNew = b.count; renderPlaces(); }).catch(() => {}); }   // the "N new" badge on Photo backup
 
 const WIFI_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></svg>';
 const USB_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v15M8 7l4-4 4 4M7 11v2l5 3M17 9v3l-5 3"/><circle cx="12" cy="20" r="1.5"/></svg>';
+const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const devName = (info, cur) => info ? `${info.manufacturer} ${info.model}`.trim() : (cur && cur.model) || S.serial || "Phone";
 function renderDevice(info) {
   const box = $("#deviceBox"); const usable = S.devices.filter(x => x.state === "device");
   const cur = usable.find(x => x.serial === S.serial);
-  if (!S.serial || !cur) { box.innerHTML = `<p class="label">Device</p><div class="device"><div><h2>No phone</h2><div class="sub">Waiting for a connection…</div></div>
-    <button class="btn full" type="button" data-wifi="qr">${WIFI_SVG}Connect over Wi-Fi</button></div>`; return; }
-  const name = info ? `${info.manufacturer} ${info.model}`.trim() : cur.model || S.serial;
+  if (!S.serial || !cur) { box.innerHTML = `<button class="devrow" type="button" data-wifi="qr"><span class="dot" aria-hidden="true"></span><span class="t"><b>No phone</b><small>Plug in, or connect over Wi-Fi</small></span></button>`; return; }
+  const name = devName(info, cur);
   const wifi = cur.transport === "wifi";
-  let html = `<p class="label">Device</p><div class="device"><div><h2>${esc(name)}</h2><div class="sub">${info && info.android ? "Android " + esc(info.android) : "&nbsp;"}</div></div>
+  const bits = [wifi ? "Wi-Fi" : "Cable", info && info.battery != null ? info.battery + "%" : "", info && info.storage ? fmtSize(info.storage.free) + " free" : ""].filter(Boolean).join(" · ");
+  let html = `<button class="devrow" type="button" id="devRow" aria-expanded="${!!S.devOpen}" aria-controls="devDetails"><span class="dot on" aria-hidden="true"></span><span class="t"><b>${esc(name)}</b><small>${esc(bits)}</small></span>${CHEV}</button>
+    <div class="device" id="devDetails" ${S.devOpen ? "" : "hidden"}><div class="sub">${info && info.android ? "Android " + esc(info.android) : ""}</div>
     <div class="conn ${wifi || cur.wifi_ready ? "on" : ""}">${wifi ? WIFI_SVG : USB_SVG}<span>${wifi ? "Connected over Wi-Fi" : cur.wifi_ready ? "USB, with Wi-Fi ready. Safe to unplug." : "Connected by cable"}</span></div>`;
   if (info && info.battery != null) html += `<div class="meter"><div class="row"><span>Battery</span><b>${info.battery}%</b></div><div class="bar" role="img" aria-label="Battery ${info.battery} percent"><i class="${info.battery <= 15 ? "low" : ""}" style="width:${info.battery}%"></i></div></div>`;
   if (info && info.storage) { const st = info.storage, pct = Math.round(st.used / st.total * 100);
@@ -578,6 +693,7 @@ function renderDevice(info) {
   if (!wifi && !cur.wifi_ready) html += `<button class="btn full" type="button" id="goWifi">${WIFI_SVG}Go wireless</button><p class="tiny">Turns on Wi-Fi access so you can unplug the cable. Stays on until the phone restarts.</p>`;
   if (wifi || cur.wifi_ready) html += `<button class="btn full quiet" type="button" id="wifiOff">Turn off Wi-Fi connection</button>`;
   box.innerHTML = html + "</div>";
+  $("#devRow").onclick = () => { S.devOpen = !S.devOpen; $("#devRow").setAttribute("aria-expanded", S.devOpen); $("#devDetails").hidden = !S.devOpen; };
   const sel = $("#devSel"); if (sel) sel.onchange = () => { S.serial = sel.value; S.info = null; loadInfo(); go(HOME); };
   const gw = $("#goWifi"); if (gw) gw.onclick = goWireless;
   $("#finderBtn").onclick = showInFinder;
@@ -592,12 +708,6 @@ async function goWireless() {
   catch(e) { toast(e.message, {err:true}); b.disabled = false; b.lastChild.textContent = "Go wireless"; }
 }
 document.addEventListener("click", e => { const w = e.target.closest("[data-wifi]"); if (w) openWifi(w.dataset.wifi); });
-
-function renderPlaces() {
-  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => { const p = rel ? HOME + "/" + rel : HOME;
-    return `<li><button type="button" data-path="${esc(p)}" aria-current="${S.path === p}">${svg(ic)}<span>${esc(label)}</span></button></li>`; }).join("");
-}
-$("#places").onclick = e => { const b = e.target.closest("button[data-path]"); if (b) go(b.dataset.path); };
 
 function renderState() {
   const c = $("#content");
@@ -628,7 +738,11 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["sync","Sync folders","sync"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"]];
+const LIB = [["home","Home","house"],["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["sync","Sync folders","sync"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"],["settings","Settings","gear"]];
+// Sidebar groups below Favorites. [view, label, icon, hue]; Free up space also covers Duplicates.
+const NAV_GROUPS = [["tools", "Tools", [["space","Free up space","chart","k-teal"],["backup","Photo backup","camera","k-violet"],["sync","Sync folders","sync","k-sky"]]],
+  ["phone", "Phone", [["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["apps","Apps","apk"]]]];
+const NAV_BOTTOM = [["trash","Trash","trash"],["settings","Settings","gear"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
@@ -640,13 +754,16 @@ I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 I.clock = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
 I.trash = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
 I.search = '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>';
+I.gear = '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>';
+I.house = '<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>';
 
 function setHash(h, replace) { if (replace) history.replaceState(null, "", h); else if (location.hash !== h) history.pushState(null, "", h); }
 function routeFromHash(replace) {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith(":search:")) return showSearch(h.slice(8), replace);
   if (h.startsWith(":")) { const v = h.slice(1); if (v === "recent" || v === "trash" || PAGES[v]) return showView(v, replace); }
-  go(h && h.startsWith("/") ? h : HOME, replace);
+  if (!h.startsWith("/")) return showView("home", replace);
+  go(h, replace);
 }
 window.addEventListener("popstate", () => { if (S.serial) routeFromHash(true); });
 
@@ -734,16 +851,37 @@ async function nearestExisting(p) { let cur = parentOf(p);
 const goUp = () => { if (S.mode === "folder" && S.path !== "/") go(parentOf(S.path), false, {focus: S.path}); };
 $("#upBtn").onclick = goUp;
 
+const PLACE_HUE = {Camera:"k-violet", Screenshots:"k-pink", Pictures:"k-pink", Downloads:"k-amber", Documents:"k-lime", Music:"k-green", Movies:"k-orange", "WhatsApp media":"k-green"};
+const folded = g => store.get("fold-" + g) === "1";
 function renderPlaces() {
-  const place = (label, p, ic, tip) => `<li><button type="button" data-path="${esc(p)}" data-drop="${esc(p)}" aria-current="${S.mode === "folder" && S.path === p}"${tip ? ` title="${esc(tip)}"` : ""}>${svg(ic)}<span>${esc(label)}</span></button></li>`;
-  $("#places").innerHTML = PLACES.map(([label, rel, ic]) => place(label, rel ? HOME + "/" + rel : HOME, ic)).join("")
-    + VOLS.map(v => place(v.name, v.path, "sd", v.storage ? `${fmtSize(v.storage.free)} free of ${fmtSize(v.storage.total)}` : "")).join("");
-  $("#library").innerHTML = LIB.map(([v, label, ic]) => `<li><button type="button" data-lib="${v}" aria-current="${S.mode === v}">${svg(ic)}<span>${label}</span></button></li>`).join("");
+  const place = (label, p, ic, hue, tip) => `<li><button type="button" class="${hue || ""}" data-path="${esc(p)}" data-drop="${esc(p)}" aria-current="${S.mode === "folder" && S.path === p}"${tip ? ` title="${esc(tip)}"` : ""}>${svg(ic)}<span>${esc(label)}</span></button></li>`;
+  const known = PLACES.map(([label, rel, ic]) => [label, rel ? HOME + "/" + rel : HOME, ic]);
+  const extra = PINS.added.filter(p => !known.some(k => k[1] === p)).map(p => [baseName(p), p, "folder"]);
+  const favs = [...known.filter(k => PINS.has(k[1])), ...extra];
+  $("#places").innerHTML = favs.map(([label, p, ic]) => place(label, p, ic, PLACE_HUE[label] || FOLDER_HUE[label.toLowerCase()])).join("")
+    + VOLS.map(v => place(v.name, v.path, "sd", "", v.storage ? `${fmtSize(v.storage.free)} free of ${fmtSize(v.storage.total)}` : "")).join("");
+  const view = S.mode === "dupes" ? "space" : S.mode;
+  const item = ([v, label, ic, hue], badge) => `<li><button type="button" class="${hue || ""}" data-lib="${v}" aria-current="${view === v}">${svg(ic)}<span>${label}</span>${badge ? `<span class="badge">${badge}</span>` : ""}</button></li>`;
+  $("#homeNav").innerHTML = item(["home", "Home", "house"]);
+  const badges = {backup: S.backupNew ? `${S.backupNew} new` : ""};
+  $("#library").innerHTML = NAV_GROUPS.map(([g, label, list]) => { const open = !folded(g) || list.some(l => l[0] === view);
+    return `<button type="button" class="grp" data-grp="${g}" aria-expanded="${open}">${svg("chevr", 2.2)}${label}<span class="n">${list.length}</span></button>
+      <ul data-grpbody="${g}" ${open ? "" : "hidden"}>${list.map(l => item(l, badges[l[0]])).join("")}</ul>`; }).join("")
+    + `<div class="spacer"></div><ul>${NAV_BOTTOM.map(l => item(l)).join("")}</ul>`;
+  const pg = document.querySelector('.grp[data-grp="places"]'), popen = !folded("places") || favs.some(f => S.mode === "folder" && f[1] === S.path);
+  pg.setAttribute("aria-expanded", popen); $("#places").hidden = !popen; pg.querySelector(".n").textContent = favs.length + VOLS.length;
 }
-$("#places").onclick = e => { const b = e.target.closest("button[data-path]"); if (!b) return;
-  if (/\/DCIM\/Camera$/.test(b.dataset.path) && !store.get("camview")) { S.view = "grid"; S.sort = {key:"mtime", dir:-1}; store.set("camview", "1"); store.set("view", "grid"); }
-  go(b.dataset.path); };
-$("#library").onclick = e => { const b = e.target.closest("button[data-lib]"); if (b) showView(b.dataset.lib); };
+I.chevr = '<path d="m9 6 6 6-6 6"/>';
+$("#sidenav").onclick = e => {
+  const g = e.target.closest(".grp"); if (g) { const open = g.getAttribute("aria-expanded") !== "true"; store.set("fold-" + g.dataset.grp, open ? "0" : "1");
+    g.setAttribute("aria-expanded", open); const body = document.querySelector(`[data-grpbody="${g.dataset.grp}"]`); if (body) body.hidden = !open; return; }
+  const b = e.target.closest("button[data-path]");
+  if (b) { if (/\/DCIM\/Camera$/.test(b.dataset.path) && !store.get("camview")) { S.view = "grid"; S.sort = {key:"mtime", dir:-1}; store.set("camview", "1"); store.set("view", "grid"); }
+    return go(b.dataset.path); }
+  const l = e.target.closest("button[data-lib]"); if (l) showView(l.dataset.lib);
+};
+$("#places").addEventListener("contextmenu", e => { const b = e.target.closest("button[data-path]"); if (!b || VOLS.some(v => v.path === b.dataset.path)) return; e.preventDefault();
+  openMenu([{label: "Open", key: "", run: () => go(b.dataset.path)}, "-", {label: "Remove from sidebar", key: "", run: () => PINS.remove(b.dataset.path)}], e.clientX, e.clientY, b); });
 
 /* ---------- list rendering ---------- */
 function visible() {
@@ -752,6 +890,8 @@ function visible() {
   if (S.mode === "recent") return list;
   return list.sort((a, b) => {
     if (a.dir !== b.dir) return a.dir ? -1 : 1;
+    const ah = a.name.startsWith("."), bh = b.name.startsWith(".");   // hidden folders and files last
+    if (ah !== bh) return ah ? 1 : -1;
     const v = k === "name" ? a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:"base"}) : (a[k] - b[k]);
     return v * d || a.name.localeCompare(b.name);
   });
@@ -785,7 +925,7 @@ function render() {
     list.forEach((e, i) => { const k = kind(e);
       if (byDay && !e.dir) { const dk = dayKey(e.mtime); if (dk !== lastDay) { lastDay = dk; html += `<h3 class="dayhead">${esc(dayLabel(e.mtime))}<span>${counts[dk]} item${counts[dk] > 1 ? "s" : ""}</span></h3>`; } }
       const th = k === "image" ? `<img loading="lazy" decoding="async" alt="" src="${esc(thumbUrl(e))}" onerror="this.replaceWith(document.createRange().createContextualFragment('${svg("image").replace(/"/g,"&quot;")}'))">` : svg(k, 1.5);
-      html += `<div class="tilewrap${isCut(e) ? " cut" : ""}" data-row="${i}" ${e.dir ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><button type="button" class="tile" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ", " + fmtSize(e.size)}${isCut(e) ? ", cut" : ""}"><div class="thumb ${k === "folder" ? "folder" : ""}">${th}</div><div class="cap"><span class="nm">${esc(e.name)}</span><small>${e.dir ? "Folder" : fmtSize(e.size)}</small></div></button>${cb(e, i)}</div>`; });
+      html += `<div class="tilewrap${isCut(e) ? " cut" : ""}${e.name.startsWith(".") ? " hiddenf" : ""}" data-row="${i}" ${e.dir ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><button type="button" class="tile ${hueOf(e)}" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ", " + fmtSize(e.size)}${isCut(e) ? ", cut" : ""}"><div class="thumb ${k === "folder" ? "folder" : ""}">${th}</div><div class="cap"><span class="nm">${esc(e.name)}</span><small>${e.dir ? "Folder" : fmtSize(e.size)}</small></div></button>${cb(e, i)}</div>`; });
     c.innerHTML = `<div class="grid">${html}</div>`;
   } else {
     const col = (key, label, cls="") => { const on = S.sort.key === key && S.mode !== "recent";
@@ -793,7 +933,7 @@ function render() {
     const dateLabel = S.mode === "trash" ? "Deleted" : "Modified";
     c.innerHTML = `<table><colgroup><col style="width:40px"><col>${where ? '<col style="width:26%">' : ""}<col style="width:100px"><col style="width:170px"><col style="width:${S.mode === "trash" ? 120 : 150}px"></colgroup>
       <thead><tr><th class="ck"><input type="checkbox" class="sel" id="selAllBox" aria-label="Select all"></th>${col("name","Name")}${where ? `<th>${S.mode === "trash" ? "Was in" : "Where"}</th>` : ""}${col("size","Size","num")}${col("mtime", dateLabel)}<th><span class="sr">Actions</span></th></tr></thead><tbody>
-      ${list.map((e, i) => { const k = kind(e); return `<tr data-row="${i}" class="${isCut(e) ? "cut" : ""}" ${e.dir && S.mode !== "trash" ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><td class="ck">${cb(e, i)}</td><td><button type="button" class="name" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ""}${isCut(e) ? ", cut" : ""}"><span class="ico ${k === "folder" ? "folder" : ""}">${svg(k)}</span><span class="nm">${esc(e.name)}</span></button></td>
+      ${list.map((e, i) => { const k = kind(e); return `<tr data-row="${i}" class="${isCut(e) ? "cut" : ""}" ${e.dir && S.mode !== "trash" ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><td class="ck">${cb(e, i)}</td><td><button type="button" class="name" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ""}${isCut(e) ? ", cut" : ""}"><span class="ico ${k === "folder" ? "folder" : ""} ${hueOf(e)}">${svg(k)}</span><span class="nm">${esc(e.name)}</span></button></td>
         ${where ? `<td class="where" title="${esc(parentOf(ep(e)))}">${esc(placeLabel(parentOf(ep(e))).replace(/^0$/, "Internal storage"))}</td>` : ""}
         <td class="num">${e.dir ? "—" : fmtSize(e.size)}</td><td class="date">${fmtDate(e.mtime)}</td>
         <td class="act">${S.mode === "trash" ? `<button type="button" class="btn rowact" data-putback="${i}" aria-label="Put back ${esc(e.name)}">Put back</button>` : `<button type="button" class="btn rowact" data-save="${i}" aria-label="Save ${esc(e.name)} to Mac">Save to Mac</button>`}<button type="button" class="btn rowmore" data-more="${i}" aria-haspopup="menu" aria-label="More actions for ${esc(e.name)}">⋯</button></td></tr>`; }).join("")}
@@ -801,6 +941,10 @@ function render() {
   }
   syncSel();
 }
+
+// Spotlight: the hover light on a tile follows the pointer.
+$("#content").addEventListener("pointermove", e => { const t = e.target.closest && e.target.closest(".tile"); if (!t) return;
+  const r = t.getBoundingClientRect(); t.style.setProperty("--mx", (e.clientX - r.left) + "px"); t.style.setProperty("--my", (e.clientY - r.top) + "px"); });
 
 /* ---------- selection (Finder-style: checkbox, ⌘-click, shift-click, ⌘A) ---------- */
 S.sel = new Set(); let anchor = null;
@@ -914,6 +1058,7 @@ function entryMenu(list) {
   if (one) items.push({label: one.dir ? "Open" : previewable(one) ? "Preview" : "Open", key: one.dir ? "⌘↓" : "Space", run: () => open(one)});
   if (one && !one.dir) items.push({label: "Open with Mac app", key: "", run: () => openOnMac(one)});
   if (S.mode !== "folder" && one) items.push({label: "Show in enclosing folder", key: "", run: () => go(parentOf(ep(one)), false, {focus: ep(one)})});
+  if (one && one.dir) items.push(PINS.has(ep(one)) ? {label: "Remove from sidebar", key: "", run: () => PINS.remove(ep(one))} : {label: "Add to sidebar", key: "", run: () => PINS.add(ep(one))});
   items.push({label: list.length > 1 ? `Save ${list.length} items to Mac` : "Save to Mac", key: "⌘S", run: () => saveEntries(list)}, "-",
     {label: "Cut", key: "⌘X", run: () => setClip(list, "cut")},
     {label: "Copy", key: "⌘C", run: () => setClip(list, "copy")},
@@ -1183,7 +1328,6 @@ async function saveEntries(list) {
       toast(list.length === 1 ? `Saved “${baseName(target)}” to Downloads/Cellar` : `Saved ${j.result.saved.length} items`, {action: ["Show in Finder", () => api("/api/reveal", {path: target}, {method:"POST"})], ms: 8000}); });
   } catch(e) { toast(e.message, {err:true}); }
 }
-$("#revealBtn").onclick = () => api("/api/reveal", {}, {method:"POST"});
 async function openOnMac(e) {
   const t = toast(`Opening “${e.name}” on your Mac…`, {ms: 120000});
   try { await api("/api/openmac", {path: ep(e)}, {method:"POST"}); t.remove(); toast("Opened on your Mac. Changes you save there are copied back to the phone.", {ms: 8000}); }
@@ -1438,10 +1582,6 @@ async function showInFinder() {
     else toast(r.note ? `${r.note}. Address: ${r.url}` : "Finder didn't confirm the connection. Try Go › Connect to Server with " + r.url, {ms: 12000}); }
   catch(e) { t.remove(); toast(e.message, {err:true}); }
 }
-const ST = $("#settings");
-$("#settingsBtn").onclick = async () => { try { const s = await api("/api/settings"); $("#stFinder").checked = s.finder_auto; $("#stNotify").checked = s.notifications; } catch(e) {} ST.showModal(); };
-$("#stClose").onclick = () => ST.close();
-["stFinder", "stNotify"].forEach(id => $("#" + id).onchange = () => postJSON("/api/settings", {finder_auto: $("#stFinder").checked, notifications: $("#stNotify").checked}).catch(e => toast(e.message, {err:true})));
 
 /* ---------- upload: Mac → phone through the transfer queue ---------- */
 const JUNK = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
@@ -1597,10 +1737,13 @@ async function runScan(kind, root, opts, token, onTick) {
   if (cur.state === "cancelled") throw new Error("cancelled");
   return cur.result;
 }
-const scanBusy = (title, text, id) => `<div class="page"><h1>${title}</h1><div class="panel scanning" role="status"><div class="spinner" style="margin:6px auto"></div><p id="${id}" class="muted" style="text-align:center;margin:0">${esc(text)}</p><p style="text-align:center;margin:0" class="muted">This can take a minute on a full phone. You can keep using Cellar.</p></div></div>`;
+const scanBusy = (title, text, id) => `<div class="page"><h1>${title}</h1>${freeTabs(id === "dpProg" ? "dupes" : "space")}<div class="panel scanning" role="status"><div class="spinner" style="margin:6px auto"></div><p id="${id}" class="muted" style="text-align:center;margin:0">${esc(text)}</p><p style="text-align:center;margin:0" class="muted">This can take a minute on a full phone. You can keep using Cellar.</p></div></div>`;
 const rootTabs = (cur, attr) => { const roots = [{path:HOME, name:"Internal storage"}, ...VOLS]; if (roots.length < 2) return "";
   return `<div class="tabs" role="tablist" style="grid-template-columns:repeat(${roots.length},1fr);max-width:${roots.length * 190}px">${roots.map(r => `<button type="button" role="tab" ${attr}="${esc(r.path)}" aria-selected="${r.path === cur}">${esc(r.name)}</button>`).join("")}</div>`; };
 const pct = (a, b) => b ? Math.max(0.5, a / b * 100) : 0;
+// "Free up space" in the sidebar holds both scans; these tabs switch between them.
+const freeTabs = cur => `<div class="subtabs" role="navigation" aria-label="Free up space">${[["space","Big files and folders"],["dupes","Duplicates"]].map(([v, l]) => `<button type="button" data-ftab="${v}" aria-current="${cur === v}">${l}</button>`).join("")}</div>`;
+$("#content").addEventListener("click", e => { const t = e.target.closest("[data-ftab]"); if (t && t.getAttribute("aria-current") !== "true") showView(t.dataset.ftab); });
 
 /* ---------- What's taking space ---------- */
 const SPACE = {root: null, cache: {}, sel: new Set()};
@@ -1624,7 +1767,7 @@ function drawSpace(r) {
   $("#content").innerHTML = `<div class="page">
     <div class="row2"><div><h1>What’s taking space</h1><p class="muted" style="margin:4px 0 0">Scanned ${fmtDate(r.at)}. Save big files to your Mac, then move them to the Trash on the phone.</p></div>
       <button class="btn" type="button" id="spAgain">Scan again</button></div>
-    ${rootTabs(r.root, "data-sproot")}
+    ${freeTabs("space")}${rootTabs(r.root, "data-sproot")}
     <section class="panel" aria-labelledby="spTot"><div class="bignum" id="spTot">${fmtSize(r.total)}<small>in ${r.files.toLocaleString()} files${st ? ` · ${fmtSize(st.free)} free of ${fmtSize(st.total)}` : ""}</small></div>
       <div class="typebar" role="img" aria-label="${esc(r.types.map(t => `${t.type} ${fmtSize(t.bytes)}`).join(", "))}">${r.types.map(t => `<i style="flex:${t.bytes};background:${TYPE_COLORS[t.type]}" title="${esc(t.type)}: ${fmtSize(t.bytes)}"></i>`).join("")}</div>
       <ul class="legend">${r.types.map(t => `<li><i style="background:${TYPE_COLORS[t.type]}" aria-hidden="true"></i><span>${esc(t.type)}</span><b>${fmtSize(t.bytes)}</b><small>${t.count.toLocaleString()} file${t.count === 1 ? "" : "s"}</small></li>`).join("")}</ul>
@@ -1693,7 +1836,7 @@ function drawDupes(r, key) {
   $("#content").innerHTML = `<div class="page">
     <div class="row2"><div><h1>Duplicate files</h1><p class="muted" style="margin:4px 0 0">Files with exactly the same content. Choose the copy to keep in each group. The others go to the Trash, where you can put them back for 30 days.</p></div>
       <button class="btn" type="button" id="dpAgain">Scan again</button></div>
-    ${rootTabs(r.root, "data-dproot")}
+    ${freeTabs("dupes")}${rootTabs(r.root, "data-dproot")}
     ${r.groups.length ? `<section class="panel"><div class="row2"><div><div class="bignum" id="dpTot">${fmtSize(r.wasted)}<small>wasted by ${(r.total_groups || r.groups.length).toLocaleString()} group${(r.total_groups || r.groups.length) === 1 ? "" : "s"} of duplicates${r.total_groups > r.groups.length ? `. Showing the ${r.groups.length} biggest` : ""}</small></div></div>
       <button class="btn primary" type="button" id="dpGo"></button></div></section>
     ${r.groups.map((g, gi) => `<fieldset class="group"><legend>${esc(g.files[0].name)}<small class="muted"> · ${fmtSize(g.size)} each · ${g.files.length} copies</small></legend>
@@ -1777,16 +1920,23 @@ const DND_OPTS = [["off","Off","Everything comes through"],["priority","Priority
 async function renderExtras(token) {
   let x; try { x = await api("/api/extras"); } catch(e) { $("#content").innerHTML = stateHTML("phone", "Couldn’t reach the phone", esc(e.message)); return; }
   if (S.loadToken !== token) return;
-  $("#content").innerHTML = `<div class="page"><h1>Phone controls</h1><p class="lead">Quick controls for the connected phone. Phones differ, so anything that doesn’t work on yours is marked.</p>
-    <section class="panel" aria-labelledby="xrRing"><div class="row2"><div><h2 id="xrRing">Ring my phone</h2>
-      <p class="muted" style="margin:4px 0 0">${x.can_ring ? `Sets a one-time alarm for the next minute at full volume, even on silent. Dismiss it on the phone, then delete the “Cellar: finding your phone” alarm in the Clock app.` : `Not available on this phone: it has no Clock app Cellar can use. Try Google’s Find My Device.`}</p></div>
-      <button class="btn primary" type="button" id="xrRingGo" ${x.can_ring ? "" : "disabled"}>Ring</button></div><p class="note" id="xrRingMsg" aria-live="polite"></p></section>
-    <section class="panel" aria-labelledby="xrMedia"><h2 id="xrMedia">Music and volume</h2><div class="mediarow">
-      ${MEDIA_BTNS.map(([k, label, d]) => `<button class="btn icon big" type="button" data-media="${k}" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg></button>`).join("")}</div>
-      <p class="note">Works with the music or video app that’s playing on the phone.</p></section>
+  const dndNow = (DND_OPTS.find(o => o[0] === x.dnd) || [0, "unknown"])[1];
+  $("#content").innerHTML = `<div class="page"><div><h1>Phone controls</h1><p class="muted" style="margin:4px 0 0">${esc(devName(S.info))} · Do Not Disturb: ${esc(dndNow.toLowerCase())}</p></div>
+    <div class="cols2"><div>
+    <section class="panel" aria-labelledby="xrRing"><div class="row2"><div style="flex:1;min-width:220px"><h2 id="xrRing">Ring my phone</h2>
+      <p class="muted" style="margin:4px 0 0">${x.can_ring ? `Rings at full volume for a minute, even on silent. Afterwards, delete the “Cellar: finding your phone” alarm in the Clock app.` : `Not available on this phone: it has no Clock app Cellar can use. Try Google’s Find My Device.`}</p></div>
+      <button class="btn primary" type="button" id="xrRingGo" ${x.can_ring ? "" : "disabled"}>Ring now</button></div><p class="note" id="xrRingMsg" aria-live="polite"></p></section>
+    <section class="panel" aria-labelledby="xrMedia"><div><h2 id="xrMedia">Music and volume</h2><p class="muted" style="margin:4px 0 0">Controls whatever is playing on the phone.</p></div><div class="media6">
+      ${MEDIA_BTNS.map(([k, label, d]) => `<button class="btn" type="button" data-media="${k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>${label}</button>`).join("")}</div></section>
+    </div><div>
     <section class="panel" aria-labelledby="xrDnd"><h2 id="xrDnd">Do Not Disturb</h2>${x.dnd == null ? `<p class="note">This phone didn’t report its Do Not Disturb setting, so it may not be controllable from here. You can still try.</p>` : ""}
       <div class="dndopts" role="radiogroup" aria-labelledby="xrDnd">${DND_OPTS.map(([k, label, sub]) => `<label class="toggle"><input type="radio" name="dnd" value="${k}" ${x.dnd === k ? "checked" : ""}><span><b>${label}</b><small>${sub}</small></span></label>`).join("")}</div>
-      <p class="note" id="xrDndMsg" aria-live="polite"></p></section></div>`;
+      <p class="note" id="xrDndMsg" aria-live="polite"></p></section>
+    <section class="panel" aria-labelledby="xrScreen"><h2 id="xrScreen">Screen and camera</h2><div class="spbar">
+      <button class="btn" type="button" data-xr="mirror">Mirror screen</button><button class="btn" type="button" data-xr="shot">Take a screenshot</button><button class="btn" type="button" data-xr="camera">Phone camera</button></div></section>
+    </div></div></div>`;
+  document.querySelectorAll("[data-xr]").forEach(b => b.onclick = () => { if (b.dataset.xr === "shot") return $("#shotBtn").click();
+    $("#mirrorBtn").click(); if (b.dataset.xr === "camera") setTimeout(() => { const c = $("#mrCamTab"); if (c) c.click(); }, 400); });
   $("#xrRingGo").onclick = async () => { const b = $("#xrRingGo"), m = $("#xrRingMsg"); b.disabled = true;
     try { const r = await postJSON("/api/ring", {}); m.textContent = `Alarm set for ${r.at}. If nothing rings within a minute or two, this phone doesn’t support it.`; }
     catch(e) { m.textContent = e.message; m.className = "note bad"; } b.disabled = false; };
@@ -1868,6 +2018,101 @@ async function showSyncPreview(id) {
   } catch(e) { box.innerHTML = ""; toast(e.message, {err:true}); }
 }
 PAGES.sync = renderSync;
+
+/* ---------- Home: the first screen ---------- */
+async function renderHome(token) {
+  const cam = PLACES.find(p => p[0] === "Camera"), camPath = cam ? HOME + "/" + cam[1] : null;
+  const [bk, rec, camLs, sy] = (await Promise.allSettled([api("/api/backup"), api("/api/recent"), camPath ? api("/api/ls", {path: camPath}) : Promise.reject(), api("/api/sync")])).map(x => x.status === "fulfilled" ? x.value : null);
+  if (S.loadToken !== token) return;
+  const info = S.info, cur = S.devices.find(d => d.serial === S.serial) || {}, wifi = cur.transport === "wifi";
+  S.backupNew = bk ? bk.count : 0; renderPlaces();
+  const sub = [wifi ? "Connected over Wi-Fi" : "Connected by cable", info && info.android ? "Android " + info.android : "", info && info.battery != null ? `Battery ${info.battery}%` : ""].filter(Boolean).join(" · ");
+  const st = info && info.storage, sp = SPACE.cache[S.serial + "|" + HOME];
+  const what = bk && bk.count ? `${bk.photos ? `${bk.photos} photo${bk.photos > 1 ? "s" : ""}` : ""}${bk.photos && bk.videos ? " and " : ""}${bk.videos ? `${bk.videos} video${bk.videos > 1 ? "s" : ""}` : ""}` : "";
+  const since = bk && bk.last ? `since your last backup on ${new Date(bk.last * 1000).toLocaleDateString(undefined, {day:"numeric", month:"long"})}` : "not backed up to this Mac yet";
+  // Storage: the scan's breakdown by type when one has run, otherwise used against free.
+  let bar = "", legend = "";
+  if (st && sp) { const other = Math.max(0, st.used - sp.total);
+    const parts = [...sp.types.map(t => [t.type, t.bytes, TYPE_COLORS[t.type]]), ["System and apps", other, "var(--line-strong)"]].filter(p => p[1] > 0);
+    bar = parts.map(p => `<i style="width:${pct(p[1], st.total)}%;background:${p[2]}" title="${esc(p[0])}: ${fmtSize(p[1])}"></i>`).join("");
+    legend = `<ul class="legend">${parts.map(p => `<li><i style="background:${p[2]}" aria-hidden="true"></i><span>${esc(p[0])}</span><b>${fmtSize(p[1])}</b></li>`).join("")}<li><i style="background:var(--hover)" aria-hidden="true"></i><span>Free</span><b>${fmtSize(st.free)}</b></li></ul>`; }
+  else if (st) { bar = `<i style="width:${pct(st.used, st.total)}%;background:var(--accent)"></i>`;
+    legend = `<ul class="legend"><li><i style="background:var(--accent)" aria-hidden="true"></i><span>Used</span><b>${fmtSize(st.used)}</b></li><li><i style="background:var(--hover);box-shadow:inset 0 0 0 1px var(--line)" aria-hidden="true"></i><span>Free</span><b>${fmtSize(st.free)}</b></li></ul>
+      <div class="row2"><p class="muted" style="margin:0">Scan once to split this into photos, videos, apps and more.</p><button class="btn" type="button" data-go="space">Scan storage</button></div>`; }
+  const shots = camLs ? camLs.entries.filter(e => !e.dir && kind(e) === "image").sort((a, b) => b.mtime - a.mtime).slice(0, 8).map(e => Object.assign(e, {path: join(camPath, e.name)})) : [];
+  const recent = rec ? rec.entries.slice(0, 6) : [];
+  const pairs = sy ? sy.pairs.length : 0;
+  $("#content").innerHTML = `<div class="page">
+    <div class="row2" style="align-items:flex-start"><div><h1>${esc(devName(info, cur))}</h1><p class="muted" style="margin:4px 0 0">${esc(sub)}</p></div>
+      <div class="spbar"><button class="btn" type="button" id="hmFinder">Show in Finder</button>${!wifi && !cur.wifi_ready ? `<button class="btn" type="button" id="hmWifi">Go wireless</button>` : ""}</div></div>
+    ${bk && bk.count ? `<div class="finding"><p><b>${what}</b> ${since}.</p><button class="btn primary" type="button" id="hmBackup">Back up now</button></div>` : ""}
+    <div class="cols3">
+      <section class="panel span2" aria-labelledby="hmSt"><div class="phead"><h2 id="hmSt">Storage</h2>${sp ? `<button class="linkbtn" type="button" data-go="space">Free up space</button>` : ""}</div>
+        ${st ? `<div class="bignum">${fmtSize(st.free)}<small>free · ${fmtSize(st.used)} used of ${fmtSize(st.total)}</small></div>
+        <div class="sbar" role="img" aria-label="${fmtSize(st.used)} used of ${fmtSize(st.total)}">${bar}</div>${legend}` : `<p class="muted">Storage isn’t known yet.</p>`}</section>
+      <section class="panel qa" aria-labelledby="hmQa"><h2 id="hmQa">Quick actions</h2>
+        <button type="button" data-go="backup"><b>Back up photos</b><small>${bk ? (bk.count ? `${bk.count.toLocaleString()} new · ${fmtSize(bk.bytes)}` : "Everything is backed up") : "Copy new photos to your Mac"}</small></button>
+        <button type="button" data-go="space"><b>Free up space</b><small>Big folders, big files and duplicates</small></button>
+        <button type="button" data-go="export"><b>Export contacts and calendar</b><small>Contacts, call history and events</small></button>
+        <button type="button" data-go="sync"><b>Sync a folder</b><small>${pairs ? `${pairs} folder pair${pairs > 1 ? "s" : ""}` : "No folders paired yet"}</small></button></section>
+    </div>
+    <div class="cols3">
+      <section class="panel span2" aria-labelledby="hmCam"><div class="phead"><h2 id="hmCam">Latest from Camera</h2>${camPath ? `<button class="linkbtn" type="button" data-open="${esc(camPath)}">Open Camera${camLs ? ` · ${camLs.entries.length.toLocaleString()} items` : ""}</button>` : ""}</div>
+        ${shots.length ? `<div class="shots">${shots.map(e => `<button type="button" data-open="${esc(camPath)}" data-focus="${esc(e.path)}" aria-label="${esc(e.name)}"><img loading="lazy" alt="" src="${esc(thumbUrl(e, 300))}"></button>`).join("")}</div>` : `<p class="muted" style="margin:0">No photos in Camera yet.</p>`}</section>
+      <section class="panel" aria-labelledby="hmRec"><div class="phead"><h2 id="hmRec">Recent</h2><button class="linkbtn" type="button" data-go="recent">See all</button></div>
+        ${recent.length ? `<ul class="rlist">${recent.map(e => `<li><button type="button" data-open="${esc(parentOf(e.path))}" data-focus="${esc(e.path)}"><span class="ico ${hueOf(e)}">${svg(kind(e))}</span><span class="t"><b>${esc(e.name)}</b><small>${esc(placeLabel(parentOf(e.path)))} · ${fmtDate(e.mtime)}</small></span></button></li>`).join("")}</ul>` : `<p class="muted" style="margin:0">Nothing changed in the last 14 days.</p>`}</section>
+    </div></div>`;
+  $("#hmFinder").onclick = showInFinder;
+  const w = $("#hmWifi"); if (w) w.onclick = async () => { w.disabled = true; try { const r = await api("/api/wifi/enable", {}, {method:"POST"}); toast(`Wireless is on at ${r.address}. You can unplug the cable whenever you like.`, {ms:8000}); refreshDevices(); } catch(e) { toast(e.message, {err:true}); w.disabled = false; } };
+  const b = $("#hmBackup"); if (b) b.onclick = async () => { b.disabled = true;
+    try { const j = await api("/api/backup/run", {}, {method:"POST"}); if (j.nothing) return renderHome(S.loadToken);
+      trackJob(j, jj => { if (S.mode === "home") renderHome(S.loadToken); if (jj.state === "done") toast(`Backed up ${jj.items_done - jj.errors.length} items`, {action: ["Show in Finder", () => api("/api/reveal", {path: jj.result.dest}, {method:"POST"})]}); }); }
+    catch(e) { toast(e.message, {err:true}); b.disabled = false; } };
+}
+PAGES.home = renderHome;
+$("#content").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]"); if (g) return showView(g.dataset.go);
+  const o = e.target.closest("[data-open]"); if (o && isPage()) go(o.dataset.open, false, o.dataset.focus ? {focus: o.dataset.focus} : {});
+});
+
+/* ---------- Settings, with Appearance ---------- */
+const THEMES = [["graphite","Graphite","Plain black and white. Default.",["#111111","#0c0c0c","#161616","#2e2e2e","#f5f5f5","#a8a8a8","#ececec"]],
+  ["violet","Violet","Near-black with a purple accent",["#120f17","#0f0d13","#15121b","#2f293a","#f5f3f7","#a8a2b3","#9333ea"]],
+  ["midnight","Midnight","Deep blue, easy on the eyes",["#0d1117","#0a0e14","#11161f","#263041","#f3f6fa","#9ea9b8","#2563eb"]],
+  ["forest","Forest","Dark green",["#0e1311","#0b0f0d","#121916","#27352f","#f2f7f4","#9fb0a8","#15803d"]],
+  ["ember","Ember","Warm brown with orange",["#14100e","#100c0a","#1a1512","#3a2e27","#faf5f2","#b3a69d","#c2410c"]],
+  ["daylight","Daylight","Light, for bright rooms",["#faf9fc","#f3f1f6","#ffffff","#e4e0ea","#17141c","#5f5868","#7e22ce"]]];
+async function renderSettings(token) {
+  let s = {}; try { s = await api("/api/settings"); } catch(e) {}
+  if (S.loadToken !== token) return;
+  const chosen = store.get("theme") || "graphite", on = k => store.get(k) !== "0";
+  const tog = (id, title, note, checked) => `<label class="toggle"><input type="checkbox" id="${id}" ${checked ? "checked" : ""}><span><b>${title}</b><small>${note}</small></span></label>`;
+  $("#content").innerHTML = `<div class="page"><div><h1>Settings</h1><p class="muted" style="margin:4px 0 0">Appearance applies to this window${APPEARANCE.inApp ? " and the menu bar app" : ""}.</p></div>
+    <section class="panel" aria-labelledby="stTheme"><h2 id="stTheme">Theme</h2>
+      <div class="themes" role="radiogroup" aria-labelledby="stTheme">${THEMES.map(([id, name, note, c]) => `<button type="button" class="theme" role="radio" data-theme-pick="${id}" aria-checked="${id === chosen}">
+        <span class="pv" aria-hidden="true" style="background:${c[0]};border-color:${c[3]}"><span style="background:${c[1]};border-right:1px solid ${c[3]}"><i style="width:14px;height:14px;border-radius:4px;background:${c[6]}"></i><i style="width:80%;background:${c[5]}"></i><i style="width:60%;background:${c[5]};opacity:.6"></i><i style="width:70%;background:${c[5]};opacity:.6"></i></span>
+        <span><i style="width:55%;height:7px;background:${c[4]}"></i><span style="flex:1;border-radius:6px;background:${c[2]};border:1px solid ${c[3]};display:flex;align-items:flex-end;justify-content:flex-end;padding:6px"><i style="width:34px;height:12px;border-radius:4px;background:${c[6]}"></i></span></span></span>
+        <b>${name}</b><small>${note}</small></button>`).join("")}</div>
+      ${tog("stGlass", "Liquid Glass", APPEARANCE.inApp ? "The sidebar shows your desktop through frosted glass, and menus, dialogs and the transfers panel float on glass, like other macOS apps." : "Menus, dialogs, toasts and the transfers panel float on frosted glass. In the Cellar Mac app the sidebar turns to glass too.", on("glass"))}
+      ${tog("stMatch", "Match macOS", "Switch to Daylight when your Mac is in light mode, and back when it’s dark.", store.get("matchos") === "1")}
+      ${tog("stKind", "Colour by kind", "Folders, file icons and sidebar icons take the colour of what they hold: Camera violet, Pictures pink, Downloads amber and so on.", on("kind"))}</section>
+    <div class="cols2"><div>
+      <section class="panel" aria-labelledby="stPhone"><h2 id="stPhone">Phone</h2>
+        ${tog("stFinder", "Show the phone in Finder when it connects", "It appears under Locations, so Finder’s own copy, paste and drag work.", s.finder_auto)}
+        ${tog("stNotify", "Notifications", "Tell me when long transfers and backups finish.", s.notifications)}</section>
+      <section class="panel" aria-labelledby="stFiles"><h2 id="stFiles">Saved files</h2><div class="pathbox"><code>~/Downloads/Cellar</code><button class="btn" type="button" id="revealBtn">Show in Finder</button></div></section>
+    </div><div>
+      <section class="panel" aria-labelledby="stKeys"><h2 id="stKeys">Shortcuts</h2><ul class="legend" style="grid-template-columns:1fr">${[["⌘C · ⌘X · ⌘V","Copy, cut, paste"],["⌥⌘V","Move here"],["⌘⌫","Move to Trash"],["⌘Z","Undo"],["F2","Rename"],["⌘D","Duplicate"],["⌥⌘N","New folder"],["Space","Preview"],["⌘F","Search the phone"]].map(([k, l]) => `<li><span>${l}</span><b>${k}</b></li>`).join("")}</ul></section>
+    </div></div></div>`;
+  document.querySelectorAll("[data-theme-pick]").forEach(b => b.onclick = () => { store.set("theme", b.dataset.themePick); APPEARANCE.apply();
+    document.querySelectorAll("[data-theme-pick]").forEach(x => x.setAttribute("aria-checked", x === b)); });
+  $("#stGlass").onchange = e => { store.set("glass", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
+  $("#stMatch").onchange = e => { store.set("matchos", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
+  $("#stKind").onchange = e => { store.set("kind", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
+  ["stFinder", "stNotify"].forEach(id => $("#" + id).onchange = () => postJSON("/api/settings", {finder_auto: $("#stFinder").checked, notifications: $("#stNotify").checked}).catch(e => toast(e.message, {err:true})));
+  $("#revealBtn").onclick = () => api("/api/reveal", {}, {method:"POST"});
+}
+PAGES.settings = renderSettings;
 
 /*__NEWPAGES__*/
 

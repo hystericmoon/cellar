@@ -3300,7 +3300,19 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
         return self.send_json({"ok": True})
 
 
+def watch_parent(pid):
+    # Started by the Mac app: exit when the app is gone, even if it was force-quit and never
+    # got to stop us. Otherwise this server would keep port 8765 and serve old code to the next launch.
+    while True:
+        time.sleep(2)
+        if os.getppid() != pid:
+            os._exit(0)
+
+
 def main():
+    parent = os.environ.get("CELLAR_PARENT_PID", "")
+    if parent.isdigit():
+        threading.Thread(target=watch_parent, args=(int(parent),), daemon=True).start()
     port = int(os.environ.get("CELLAR_PORT", "8765"))
     server = None
     for p in range(port, port + 20):

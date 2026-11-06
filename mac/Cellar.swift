@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
         var env = ProcessInfo.processInfo.environment
         env["CELLAR_NO_BROWSER"] = "1"
         env["CELLAR_TOKEN"] = token
+        env["CELLAR_PARENT_PID"] = String(getpid())   // the server exits by itself if this app is killed
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         p.environment = env
         let out = Pipe()
@@ -328,21 +329,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
             w.title = "Cellar"
-            w.titlebarAppearsTransparent = false
+            // Liquid Glass: a transparent title bar over a glass window background. The page leaves its
+            // sidebar see-through (Settings › Liquid Glass), so the desktop shows through it.
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
             w.minSize = NSSize(width: 860, height: 480)
-            w.contentView = wv
+            let glass = makeGlassBackground()
+            wv.translatesAutoresizingMaskIntoConstraints = false
+            let drag = DragStrip()
+            drag.translatesAutoresizingMaskIntoConstraints = false
+            glass.addSubview(wv)
+            glass.addSubview(drag)
+            NSLayoutConstraint.activate([
+                wv.leadingAnchor.constraint(equalTo: glass.leadingAnchor), wv.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+                wv.topAnchor.constraint(equalTo: glass.topAnchor), wv.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+                // The page keeps the top of its sidebar empty for the traffic lights; this strip makes it drag the window.
+                drag.leadingAnchor.constraint(equalTo: glass.leadingAnchor), drag.topAnchor.constraint(equalTo: glass.topAnchor),
+                drag.widthAnchor.constraint(equalToConstant: 248), drag.heightAnchor.constraint(equalToConstant: 40),
+            ])
+            w.contentView = glass
             w.center()
             w.setFrameAutosaveName("CellarMain")
             w.isReleasedWhenClosed = false
             w.delegate = self
             window = w
             webView = wv
-            wv.load(URLRequest(url: base))
+            wv.load(URLRequest(url: appURL(base)))
         } else if webView?.url == nil || webView?.url?.host != base.host || webView?.url?.port != base.port {
-            webView?.load(URLRequest(url: base))
+            webView?.load(URLRequest(url: appURL(base)))
         }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// "?app=1" tells the page it runs inside this window: it reserves room for the traffic lights and
+    /// lets the glass background show through its sidebar.
+    private func appURL(_ base: URL) -> URL {
+        var c = URLComponents(url: base, resolvingAgainstBaseURL: false)
+        c?.queryItems = [URLQueryItem(name: "app", value: "1")]
+        return c?.url ?? base
+    }
+
+    /// Liquid Glass on macOS 26 and later; the frosted sidebar material on older versions.
+    private func makeGlassBackground() -> NSView {
+        if #available(macOS 26.0, *) {
+            let g = NSGlassEffectView()
+            g.cornerRadius = 0
+            return GlassHost(background: g)
+        }
+        let v = NSVisualEffectView()
+        v.material = .sidebar
+        v.blendingMode = .behindWindow
+        v.state = .followsWindowActiveState
+        return v
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -410,3 +449,26 @@ app.delegate = delegate
 app.setActivationPolicy(.accessory)
 buildMainMenu()
 app.run()
+
+/// Holds a full-size background view (the window's glass) with the page and the drag strip on top of it.
+final class GlassHost: NSView {
+    init(background: NSView) {
+        super.init(frame: .zero)
+        background.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(background)
+        NSLayoutConstraint.activate([
+            background.leadingAnchor.constraint(equalTo: leadingAnchor), background.trailingAnchor.constraint(equalTo: trailingAnchor),
+            background.topAnchor.constraint(equalTo: topAnchor), background.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+}
+
+/// An invisible strip over the top of the sidebar: drags the window, and a double-click zooms it,
+/// as a title bar would. The web view under it would otherwise swallow those clicks.
+final class DragStrip: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { window?.performZoom(nil) } else { window?.performDrag(with: event) }
+    }
+}

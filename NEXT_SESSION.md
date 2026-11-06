@@ -22,6 +22,15 @@ Updated 2026-11-06. Branch `feature/handoff-build` (same as `main`, latest commi
 - New folder + Escape keeps `untitled folder` (matches Finder). Left as is.
 - Numbers isn't installed; GridCraft was used for CSV checks.
 
+## Redesign (2026-11-06, not committed yet)
+Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `ui.html`, `mac/Cellar.swift` and `tests/e2e.js`:
+- Six themes (Graphite default, Violet, Midnight, Forest, Ember, Daylight) in Settings, now a page (`#:settings`) instead of a dialog. Match macOS (off by default) switches to Daylight in light mode. Stored in localStorage `dv-theme`, `dv-matchos`, `dv-glass`, `dv-kind`.
+- Liquid Glass: the Mac app loads `/?app=1`; its window has a transparent title bar over `NSGlassEffectView` (macOS 26+) or `NSVisualEffectView`, with a 248×40 `DragStrip` over the top of the sidebar for dragging. The page makes the sidebar see-through (`html.in-app.glass`). In any browser, menus, dialogs, toasts and transfers use backdrop blur. Don't name a root class `app`: it clashes with the `.app` grid.
+- Home (`#:home`) is the first screen: backup finding, storage, quick actions, latest Camera photos, Recent.
+- Sidebar: compact device row (click for details), Home, Favorites (Internal storage, Camera, Pictures, Downloads, Documents; right-click a folder › Add to sidebar), folding Tools and Phone groups, Trash and Settings at the bottom. Recent lives on Home; Duplicates is a tab of Free up space.
+- Colour by kind on folders, file icons and sidebar icons; spotlight hover on tiles; hidden folders sort last; labelled toolbar buttons; Phone controls in two columns.
+- Checked: page parses, Settings and theme switching in the browser, the Mac window layout with glass. Not yet checked with the phone connected (Home, folders, Camera grid), and CI has not run the updated tests.
+
 ## Still open
 1. **Real Finder drag** into Cellar. Only tested with a synthetic drop. Needs the user at the Mac.
 2. **Wireless pairing** failed with "protocol fault" (slow Wi-Fi link, 111–702 ms pings; a WireGuard VPN was on). Workaround: connect by USB and use Cellar's cable-to-Wi-Fi option in the Wi-Fi dialog.

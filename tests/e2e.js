@@ -8,7 +8,9 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
   const rows = () => p.$$eval('button.name .nm', b => b.map(x => x.textContent));
   const row = n => `tr:has(button.name:has-text("${n}"))`;
   const step = async (name, fn) => { try { await fn(); } catch (e) { ok(false, name + ' threw: ' + e.message.split('\n')[0]); await p.screenshot({path:__dirname + '/shots/fail-' + name.replace(/\W+/g,'_') + '.png'}); } };
-  await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('table'); await p.click('[data-view=list]');
+  await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#hmSt');
+  ok((await p.textContent('#crumbs')).includes('Home') && await p.locator('#places button[data-path$="/Documents"]').count() === 1, 'Home is the first screen, Documents is a favorite');
+  await p.goto('http://127.0.0.1:8765/#' + encodeURIComponent(R)); await p.waitForSelector('table, .grid'); await p.click('[data-view=list]'); await p.waitForSelector('table');
   await p.click('nav button[data-path$="/Download"]'); await p.waitForSelector(row('report.pdf'));
 
   await step('menu', async () => {
@@ -64,10 +66,10 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.click('#filter'); await p.keyboard.type('invoice'); await p.waitForSelector('#hint:has-text("whole phone")');
     await p.keyboard.press('Enter'); await p.waitForSelector(row('Invoice-Oct.pdf'));
     ok((await p.textContent(row('Invoice-Oct.pdf'))).includes('Download'), 'whole-phone search with Where column');
-    await p.click('#library button[data-lib=recent]'); await p.waitForSelector('#crumbs:has-text("Recent")'); await p.waitForTimeout(800); ok((await rows()).length > 3, 'Recent view lists files');
+    await p.evaluate(() => { location.hash = ':recent'; }); await p.waitForSelector('#crumbs:has-text("Recent")'); await p.waitForTimeout(800); ok((await rows()).length > 3, 'Recent view lists files');
   });
   await step('save', async () => {
-    await p.click('#library button[data-lib=recent]'); await p.waitForSelector(row('Invoice-Oct.pdf'));
+    await p.evaluate(() => { location.hash = ':recent'; }); await p.waitForSelector(row('Invoice-Oct.pdf'));
     await p.click(row('Invoice-Oct.pdf') + ' [data-save]'); await p.waitForSelector('#txList li:has-text("Invoice-Oct.pdf"):has-text("Done")', {timeout:8000});
     ok(fs.existsSync(process.env.HOME + '/Downloads/Cellar/Invoice-Oct.pdf'), 'Save to Mac via transfer queue');
   });
@@ -100,14 +102,17 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
   await step('restyle', async () => {
     await p.emulateMedia({colorScheme:'light'}); await p.click('[data-view=list]'); await p.waitForSelector(row('Work'));
     const css = await p.evaluate(() => { const g = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return {text:g('--text'), muted:g('--muted'), line:g('--line'), accent:g('--accent')}; });
-    ok(css.text === '#09090b' && css.muted === '#71717a' && css.line === '#e4e4e7' && css.accent === '#18181b', 'zinc tokens in light mode');
+    ok(css.text === '#f5f5f5' && css.muted === '#a8a8a8' && css.line === '#2e2e2e' && css.accent === '#ececec', 'Graphite is the default theme, even in light mode');
     await p.click(row('Work') + ' td.ck input.sel', {force:true});
     const sel = await p.$eval(row('Work') + ' td:first-child', td => ({shadow:getComputedStyle(td).boxShadow, box:td.querySelector('input.sel').checked}));
     ok(sel.box && sel.shadow !== 'none', 'selected row has a checkmark and a left border, not just a fill');
     await p.keyboard.press('Escape');
     await p.emulateMedia({colorScheme:'dark'}); await p.waitForTimeout(100);
-    ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(9, 9, 11)', 'dark mode is zinc-950');
+    ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(17, 17, 17)', 'Graphite ground in dark mode');
     await p.emulateMedia({colorScheme:'light'});
+    const day = await p.evaluate(() => { localStorage.setItem('dv-theme', 'daylight'); APPEARANCE.apply(); const t = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+      localStorage.removeItem('dv-theme'); APPEARANCE.apply(); return t; });
+    ok(day === '#17141c', 'choosing a theme recolours the window');
   });
   await step('sd-card', async () => {
     await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#places button[data-path="/storage/1A2B-3C4D"]', {timeout:8000});
@@ -137,8 +142,8 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
   });
   await step('dupes', async () => {
     const D = R + '/Documents'; fs.writeFileSync(D + '/dupA.bin', 'A'.repeat(5000)); fs.writeFileSync(D + '/dupB.bin', 'A'.repeat(5000)); fs.utimesSync(D + '/dupA.bin', 1700000000, 1700000000);
-    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=dupes]');
-    await p.click('#library button[data-lib=dupes]'); await p.waitForSelector('#dpTot', {timeout:30000});
+    await p.goto('http://127.0.0.1:8765/#:dupes'); await p.waitForSelector('#dpTot', {timeout:30000});
+    ok(await p.getAttribute('#library button[data-lib=space]', 'aria-current') === 'true', 'Duplicates sits under Free up space in the sidebar');
     const g = p.locator('fieldset.group', {hasText: 'dupA.bin'});
     ok(await g.locator('label.dupe').count() === 2 && await g.locator('input:checked').count() === 1, 'duplicate group lists both copies, one kept');
     ok((await g.locator('label.dupe').first().textContent()).includes('Keep'), 'the oldest copy is kept by default');
