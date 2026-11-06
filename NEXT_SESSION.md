@@ -43,6 +43,7 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - The segmented List/Grid control was restyled (rounded fill, no square outline).
 
 ## Still open
+0. **Check CI for ba10e10** (`gh run list --branch main --limit 1`). Last confirmed green: 4de7856 (API 135, Browser 74). `/Applications/Cellar.app` is still the pre-redesign build; the current one is `cellar/Cellar.app` (offer to replace it).
 1. **Real Finder drag** into Cellar. Only tested with a synthetic drop. Needs the user at the Mac.
 2. **Wireless pairing** failed with "protocol fault" (slow Wi-Fi link, 111–702 ms pings; a WireGuard VPN was on). Workaround: connect by USB and use Cellar's cable-to-Wi-Fi option in the Wi-Fi dialog.
 3. **GitHub support ticket** asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
