@@ -1,12 +1,13 @@
 # Cellar: next session
 
-Updated 2026-11-06. Branch `feature/handoff-build` (same as `main`, latest commit `af753ac`; `main` has the merge commit `d5c095c`).
+Updated 2026-11-06 (evening). Work happens on `main` (latest pushed: brand, site, DMG, Unsplash photos). Working tree clean.
 
 ## State
-- **Released:** Cellar 0.1.0 at https://github.com/hystericmoon/cellar/releases/tag/v0.1.0 with `Cellar-0.1.0-arm64.zip` (ad-hoc signed, Apple silicon only). The release notes cover install, the Gatekeeper right-click → Open step, `adb`/`scrcpy` requirements, and a troubleshooting section for the "not responding" launch hang (`xattr -dr com.apple.quarantine /Applications/Cellar.app`).
-- **Merged:** PRs hystericmoon/cellar#1, hystericmoon/cellar#2 and hystericmoon/cellar#3 are all merged. `main` matches the feature branch.
-- **CI green** at the last run: API 135, Browser 71.
-- **Installed app:** `/Applications/Cellar.app` is a local build (starts in about 1 s). The downloaded release zip was replaced: macOS's security policy held it about a minute at launch or blocked it ("Security policy would not allow process"), even with the quarantine flag removed. The release notes and README now make building with `Build Mac App.command` the main install, and the build script strips the download flag from its own output, so building from a downloaded source zip is fast too. The real fix for the ready-made zip is a paid Apple Developer ID plus notarization.
+- **Released:** Cellar **0.2.0** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.0: `Cellar.dmg` (universal, ad-hoc signed, not notarized) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window). v0.1.0 (arm64 zip) is older.
+- **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically.
+- **CI:** tests green on main (API 135, Browser 74 at the last full run). The release workflow is green for v0.2.0.
+- **Installed app:** `/Applications/Cellar.app` is 0.2.0 from a Safari-flagged copy of the DMG (tested Open Anyway: opened fine). The previous build is in the Mac Trash.
+- **To release:** `git tag -a v0.2.1 -m ... && git push origin v0.2.1`. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`).
 - Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 
 ## Done (all items from the 2026-11-05 list)
@@ -50,13 +51,17 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
 
 ## Still open
-0. Done: CI green for ba10e10. `/Applications/Cellar.app` is the current build (identical to `cellar/Cellar.app`, built 13:09 from the ba10e10 sources).
-1. Done 2026-11-06: real Finder drag into the Mac app (USB phone). Two files incl. a Unicode name, a nested folder and a 60 MB file all arrived with matching md5; a repeat drop with Keep both gave `note 2.txt`. Test files are in `/sdcard/Download` and `~/Desktop/Cellar drag test`.
-2. Done 2026-11-06: fresh wireless pairing works (VPN off, ~59 ms pings). After Revoke USB debugging authorizations + Wireless debugging off/on, Cellar's Pairing code tab paired and connected on the new TLS port; Cellar lists the phone once despite extra adb transports (:5555, mDNS name). The earlier "protocol fault" was likely the VPN/slow link. Previously paired Macs reconnect by themselves. Next USB plug-in needs re-allowing the Mac on the phone.
-3. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
-4. Not tested: installing the release zip on a clean Mac.
-5. Impeccable skill update available (v4.8.0). Only on request.
+1. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
+2. **Clean-Mac install** of the DMG: skipped by the user for now. Known gap: a Mac without Command Line Tools gets asked to install them on first launch (the app runs /usr/bin/python3). Bundling a standalone Python (~40 MB) would remove this.
+3. **Not verified:** Open Anyway with the CI-built DMG itself (the local build was tested; same sources). The menu bar door icon wasn't visible in a screenshot (a menu bar organiser may hide it); the user hasn't confirmed it.
+4. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway; `make-dmg.sh` notes where signing goes.
+5. On the phone: Revoke USB debugging authorizations was used during the pairing test, so the next USB plug-in asks to allow the Mac again.
+6. Impeccable skill update available (v4.8.0). Only on request.
+
+## Done 2026-11-06 (this session)
+- CI green for ba10e10; real Finder drag test passed (md5 match, Keep both); fresh wireless pairing works (VPN off). Drag-test files were moved to Cellar's Trash on the phone and the Mac Trash.
+- Brand, site, DMG and release (see the section above). Site photos: 16 Unsplash images, no people, `docs/img/photos/CREDITS.txt`.
 
 ## Prompt to paste after /clear
 
-> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.1.0 is released. Read `NEXT_SESSION.md`, then `HANDOFF.md` and `README.md`. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
+> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.2.0 is released as a DMG and the site is at hystericmoon.github.io/cellar. Read `NEXT_SESSION.md`, then `HANDOFF.md` and `README.md`. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
