@@ -8,3 +8,6 @@ tests/fakebin/calls.log
 tests/fakebin/zen.state
 tests/fakebin/*_denied
 tests/fakebin/no_clock
+dist/
+Cellar.app/
+.DS_Store

@@ -30,7 +30,6 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - Sidebar: compact device row (click for details), Home, Favorites (Internal storage, Camera, Pictures, Downloads, Documents; right-click a folder › Add to sidebar), folding Tools and Phone groups, Trash and Settings at the bottom. Recent lives on Home; Duplicates is a tab of Free up space.
 - Colour by kind on folders, file icons and sidebar icons; spotlight hover on tiles; hidden folders sort last; labelled toolbar buttons; Phone controls in two columns.
 - Checked with the phone: Home, folder and file colours, Camera timeline, Phone controls, glass menus, the Mac window. The server now exits when the app is force-quit (CELLAR_PARENT_PID).
-- `/Applications/Cellar.app` is still the pre-redesign build; the new one is `cellar/Cellar.app` (untracked).
 - Tests: loading "/#:x" from another "#:" page doesn't reload, so old toasts stay; reload with goto('/') first.
 
 ## Wireless and Show in Finder fixes (2026-11-06)
@@ -42,11 +41,18 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - Verified on the phone: auto-mount about 7 s after launch, Show in Finder 0.26 s, quit 4 s with no mount left, Go wireless connects.
 - The segmented List/Grid control was restyled (rounded fill, no square outline).
 
+## Brand, site and DMG (2026-11-06)
+- Brand in `brand/`: the cellar door mark (steps are holes; colour follows the theme), Funnel Display wordmark, `make_brand.py` generates every asset plus `mac/AppIcon.iconset` and `mac/Menubar*Template.png`. Guide: `brand/BRAND.md`.
+- App: graphite icon with a white door, menu bar door (filled = connected, outline = no phone), wordmark in the sidebar, favicon recoloured per theme.
+- Site: `docs/index.html` (GitHub Pages from `/docs`), door colour picker, install steps with Open Anyway.
+- DMG: `mac/make-dmg.sh <version>` builds a universal app and a branded DMG with dmgbuild (create-dmg's Finder scripting didn't save the layout on macOS 26). `.github/workflows/release.yml` does it on a `v*` tag and uploads `Cellar.dmg`. Unsigned: first open needs Open Anyway. Tested 0.2.0 from a Safari-flagged copy: opened fine after Open Anyway.
+- A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
+
 ## Still open
-0. **Check CI for ba10e10** (`gh run list --branch main --limit 1`). Last confirmed green: 4de7856 (API 135, Browser 74). `/Applications/Cellar.app` is still the pre-redesign build; the current one is `cellar/Cellar.app` (offer to replace it).
-1. **Real Finder drag** into Cellar. Only tested with a synthetic drop. Needs the user at the Mac.
-2. **Wireless pairing** failed with "protocol fault" (slow Wi-Fi link, 111–702 ms pings; a WireGuard VPN was on). Workaround: connect by USB and use Cellar's cable-to-Wi-Fi option in the Wi-Fi dialog.
-3. **GitHub support ticket** asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
+0. Done: CI green for ba10e10. `/Applications/Cellar.app` is the current build (identical to `cellar/Cellar.app`, built 13:09 from the ba10e10 sources).
+1. Done 2026-11-06: real Finder drag into the Mac app (USB phone). Two files incl. a Unicode name, a nested folder and a 60 MB file all arrived with matching md5; a repeat drop with Keep both gave `note 2.txt`. Test files are in `/sdcard/Download` and `~/Desktop/Cellar drag test`.
+2. Done 2026-11-06: fresh wireless pairing works (VPN off, ~59 ms pings). After Revoke USB debugging authorizations + Wireless debugging off/on, Cellar's Pairing code tab paired and connected on the new TLS port; Cellar lists the phone once despite extra adb transports (:5555, mDNS name). The earlier "protocol fault" was likely the VPN/slow link. Previously paired Macs reconnect by themselves. Next USB plug-in needs re-allowing the Mac on the phone.
+3. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
 4. Not tested: installing the release zip on a clean Mac.
 5. Impeccable skill update available (v4.8.0). Only on request.
 

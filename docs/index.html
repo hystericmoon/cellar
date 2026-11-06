@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cellar: your Android phone, on your Mac</title>
+<meta name="description" content="Cellar is a free, open-source Android file manager for the Mac. Browse, copy and back up your phone by cable or Wi-Fi. Nothing leaves your Mac.">
+<meta property="og:title" content="Cellar: your Android phone, on your Mac">
+<meta property="og:description" content="Browse, copy and back up your Android phone from your Mac. Free and open source. Nothing leaves your Mac.">
+<meta property="og:image" content="https://hystericmoon.github.io/cellar/img/app-icon-1024.png">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+<link rel="apple-touch-icon" href="img/app-icon-1024.png">
+<style>
+@font-face{font-family:"Funnel Display";src:url(fonts/FunnelDisplay.woff2) format("woff2");font-weight:300 800;font-display:swap}
+@font-face{font-family:Geist;src:url(fonts/Geist-Variable.woff2) format("woff2");font-weight:100 900;font-display:swap}
+:root{
+  --bg:#0a0a0a;--bg2:#111;--panel:#151515;--line:#232323;--line2:#2e2e2e;
+  --text:#f5f5f5;--muted:#9a9a9a;--dim:#6b6b6b;
+  --door:#f5f5f5;--glow:rgba(255,255,255,.10);
+  --display:"Funnel Display",Geist,-apple-system,system-ui,sans-serif;
+  --sans:Geist,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+:root[data-door="violet"]{--door:#a855f7;--glow:rgba(168,85,247,.22)}
+:root[data-door="midnight"]{--door:#3b82f6;--glow:rgba(59,130,246,.22)}
+:root[data-door="forest"]{--door:#22c55e;--glow:rgba(34,197,94,.18)}
+:root[data-door="ember"]{--door:#f97316;--glow:rgba(249,115,22,.22)}
+*{box-sizing:border-box;margin:0}
+html{background:var(--bg);color:var(--text);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{overflow-x:clip}.hero{overflow-x:clip}
+a{color:inherit}
+::selection{background:var(--door);color:#0a0a0a}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.door{fill:var(--door);transition:fill .5s var(--ease)}
+svg.mark{display:block}
+
+/* nav */
+nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);background:rgba(10,10,10,.72);border-bottom:1px solid transparent;transition:border-color .3s}
+nav.scrolled{border-color:var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+nav .wm{height:22px;width:auto}
+nav .links{display:flex;gap:28px;align-items:center;font-size:14px;color:var(--muted)}
+nav .links a{text-decoration:none;transition:color .2s}
+nav .links a:hover{color:var(--text)}
+.gh{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 14px;color:var(--text)!important}
+@media (max-width:720px){nav .links a:not(.gh){display:none}}
+
+/* hero */
+.hero{position:relative;padding:96px 0 40px;text-align:center}
+.hero::before{content:"";position:absolute;left:50%;top:40px;width:780px;height:560px;transform:translateX(-50%);background:radial-gradient(closest-side,var(--glow),transparent 70%);pointer-events:none;transition:background .6s var(--ease)}
+.big-door{width:148px;height:auto;margin:0 auto 40px;position:relative;overflow:visible}
+.big-door .step{fill:var(--bg);opacity:0;transform:translateY(-6px);animation:step .7s var(--ease) forwards}
+.big-door .step:nth-of-type(1){animation-delay:.25s}.big-door .step:nth-of-type(2){animation-delay:.4s}
+.big-door .step:nth-of-type(3){animation-delay:.55s}.big-door .step:nth-of-type(4){animation-delay:.7s}
+@keyframes step{to{opacity:1;transform:none}}
+h1{font:600 clamp(38px,8vw,96px)/.98 var(--display);letter-spacing:-.035em;max-width:none;margin:0 auto}
+h1 em{font-style:normal;color:var(--door);transition:color .5s var(--ease)}
+.lede{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:46ch;margin:24px auto 0}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:36px}
+.btn{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 22px;border-radius:999px;font:500 15px var(--sans);text-decoration:none;transition:transform .2s var(--ease),background .2s,border-color .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--text);color:#0a0a0a}
+.btn.primary:hover{background:#fff}
+.btn.ghost{border:1px solid var(--line2);color:var(--text)}
+.btn.ghost:hover{border-color:#4a4a4a;background:#141414}
+.meta{margin-top:16px;font-size:13px;color:var(--dim)}
+
+/* theme picker */
+.picker{display:inline-flex;gap:6px;align-items:center;margin-top:40px;padding:6px;border:1px solid var(--line);border-radius:999px;background:var(--bg2)}
+.picker span{font-size:12px;color:var(--dim);padding:0 8px 0 10px}
+.picker button{width:26px;height:26px;border-radius:50%;border:0;cursor:pointer;background:var(--c);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);transition:transform .2s var(--ease),box-shadow .2s}
+.picker button:hover{transform:scale(1.12)}
+.picker button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c)}
+
+/* app window mock */
+.shot{margin:72px auto 0;max-width:1000px;perspective:1600px}
+.win{border:1px solid var(--line2);border-radius:14px;background:#0f0f0f;overflow:hidden;box-shadow:0 40px 120px -20px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.03);transform:rotateX(8deg);transform-origin:50% 0;transition:transform 1s var(--ease)}
+.shot.in .win{transform:none}
+.bar{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--line)}
+.bar i{width:12px;height:12px;border-radius:50%;background:#2c2c2c}
+.bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
+.app{display:grid;grid-template-columns:200px 1fr;min-height:400px;text-align:left;font-size:13px}
+.side{border-right:1px solid var(--line);padding:16px 10px;background:#0c0c0c}
+.side .wm{height:18px;margin:2px 8px 16px}
+.dev{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:14px}
+.dev b{display:block;font-weight:500;font-size:12px}.dev small{color:var(--dim);font-size:11px}
+.dev b::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#28c840;margin-right:7px;vertical-align:1px}
+.side h6{font:500 10.5px var(--sans);color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin:12px 8px 6px}
+.side p{padding:5px 8px;border-radius:7px;color:#bdbdbd;display:flex;gap:9px;align-items:center}
+.side p.on{background:#1c1c1c;color:var(--text)}
+.side p::before{content:"";width:13px;height:11px;border-radius:2px;background:var(--k,#5a5a5a);opacity:.9}
+.main{padding:16px 20px}
+.crumbs{display:flex;gap:8px;color:var(--muted);margin-bottom:16px;align-items:center}
+.crumbs b{color:var(--text);font-weight:500}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:14px}
+.tile{text-align:center}
+.tile .th{aspect-ratio:1;border-radius:10px;background:#181818;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
+.tile .th.ph{background:var(--g)}
+.fold{width:46%;height:36%;border-radius:4px;background:var(--k);position:relative}
+.fold::before{content:"";position:absolute;left:0;top:-14%;width:42%;height:20%;border-radius:3px 3px 0 0;background:var(--k)}
+.tile small{display:block;margin-top:6px;color:#cfcfcf;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast{position:absolute;right:18px;bottom:18px;background:rgba(28,28,28,.9);backdrop-filter:blur(12px);border:1px solid var(--line2);border-radius:12px;padding:10px 14px;font-size:12px;width:250px}
+.toast .pb{height:4px;border-radius:2px;background:#2a2a2a;margin-top:8px;overflow:hidden}
+.toast .pb i{display:block;height:100%;width:64%;background:var(--door);border-radius:2px;transition:background .5s;animation:pb 4s var(--ease) infinite alternate}
+@keyframes pb{from{width:18%}to{width:92%}}
+.main{position:relative}
+@media (max-width:720px){.app{grid-template-columns:1fr}.side{display:none}.toast{display:none}.win{transform:none}}
+
+/* sections */
+section{padding:120px 0 0}
+.eyebrow{font:500 13px var(--mono);color:var(--door);letter-spacing:.02em;transition:color .5s}
+h2{font:600 clamp(32px,5vw,56px)/1.04 var(--display);letter-spacing:-.03em;margin-top:14px;max-width:18ch}
+.sub{color:var(--muted);font-size:18px;max-width:52ch;margin-top:16px}
+
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-top:56px}
+.card{grid-column:span 2;border:1px solid var(--line);border-radius:20px;padding:28px;background:linear-gradient(180deg,#121212,#0d0d0d);position:relative;overflow:hidden;transition:border-color .3s,transform .4s var(--ease)}
+.card:hover{border-color:var(--line2);transform:translateY(-2px)}
+.card.w3{grid-column:span 3}.card.w4{grid-column:span 4}
+.card h3{font:600 22px/1.15 var(--display);letter-spacing:-.02em;margin-bottom:8px}
+.card p{color:var(--muted);font-size:15px}
+.card .k{font:500 12px var(--mono);color:var(--dim);margin-bottom:22px;display:flex;gap:6px;flex-wrap:wrap}
+kbd{font:500 12px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:2px 7px;color:#d0d0d0;background:#141414}
+.card .viz{height:120px;margin:-6px -6px 22px;border-radius:12px;background:#0b0b0b;border:1px solid var(--line);position:relative;overflow:hidden}
+@media (max-width:900px){.bento{grid-template-columns:repeat(2,minmax(0,1fr))}.card,.card.w3,.card.w4{grid-column:span 2}}
+
+/* viz bits */
+.flow{display:flex;align-items:center;justify-content:center;gap:16px;height:100%}
+.dev-ic{width:40px;height:64px;border:2px solid #3a3a3a;border-radius:9px}
+.mac-ic{width:86px;height:56px;border:2px solid #3a3a3a;border-radius:6px}
+.dots{display:flex;gap:6px}.dots i{width:6px;height:6px;border-radius:50%;background:var(--door);opacity:.25;animation:dot 1.4s infinite}
+.dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}.dots i:nth-child(4){animation-delay:.6s}
+@keyframes dot{40%{opacity:1}}
+.photos{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:12px;height:100%}
+.photos i{border-radius:4px;background:var(--g)}
+.finder{padding:14px 16px;font-size:12px;color:#bdbdbd}
+.finder p{display:flex;gap:8px;align-items:center;padding:3px 0}
+.finder p::before{content:"";width:12px;height:10px;border-radius:2px;background:#4a4a4a}
+.finder p.on{color:var(--text)}.finder p.on::before{background:var(--door)}
+
+/* privacy band */
+.band{margin-top:120px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:radial-gradient(600px 200px at 50% 0,var(--glow),transparent),#0c0c0c}
+.band .wrap{display:grid;grid-template-columns:1.2fr 1fr;gap:48px;padding-top:80px;padding-bottom:80px;align-items:center}
+.addr{font:600 clamp(40px,7vw,84px)/1 var(--display);letter-spacing:-.04em}
+.addr span{color:var(--door);transition:color .5s}
+.facts{display:grid;gap:14px}
+.facts p{display:flex;gap:12px;color:#cfcfcf}
+.facts p::before{content:"";flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;background:var(--door) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M5 9.5l2.6 2.5L13 6.5' fill='none' stroke='%230a0a0a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");transition:background-color .5s}
+@media (max-width:820px){.band .wrap{grid-template-columns:1fr}}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:56px;counter-reset:s}
+.st{border-top:1px solid var(--line2);padding-top:24px}
+.st::before{counter-increment:s;content:"0" counter(s);font:500 13px var(--mono);color:var(--door);transition:color .5s}
+.st h3{font:600 22px/1.2 var(--display);letter-spacing:-.02em;margin:12px 0 8px}
+.st p{color:var(--muted);font-size:15px}
+.ol{margin:12px 0 0;padding-left:20px;color:#cfcfcf;font-size:15px;display:grid;gap:4px}.fine{font-size:13px!important;color:var(--dim)!important;margin-top:12px}.st a,.meta a{color:var(--text);text-decoration-color:var(--door)}code{font:13px var(--mono);background:#141414;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#d6d6d6}
+pre{margin-top:14px;font:13px/1.6 var(--mono);background:#0f0f0f;border:1px solid var(--line);border-radius:12px;padding:12px 14px;overflow-x:auto;color:#d6d6d6}
+@media (max-width:820px){.steps{grid-template-columns:minmax(0,1fr)}}
+
+/* final cta */
+.end{text-align:center;padding:140px 0 120px}
+.end .mark{width:72px;margin:0 auto 32px}
+footer{border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:28px;padding-bottom:40px}
+footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text)}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .big-door .step{opacity:1;transform:none}.reveal{opacity:1;transform:none}.win{transform:none}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="door" viewBox="0 0 56 54"><path class="door" fill-rule="evenodd" d="M0 54V28A28 28 0 0 1 56 28V54ZM8 47.5H48A2.5 2.5 0 0 1 48 52.5H8A2.5 2.5 0 0 1 8 47.5ZM13 39.5H43A2.5 2.5 0 0 1 43 44.5H13A2.5 2.5 0 0 1 13 39.5ZM18 31.5H38A2.5 2.5 0 0 1 38 36.5H18A2.5 2.5 0 0 1 18 31.5ZM23 23.5H33A2.5 2.5 0 0 1 33 28.5H23A2.5 2.5 0 0 1 23 23.5Z"/></symbol>
+</defs></svg>
+
+<nav id="nav"><div class="wrap">
+  <a href="#" aria-label="Cellar home"><svg class="wm" viewBox="0 -4.05 365.2 71.55" aria-hidden="true"><use href="#wm"/></svg></a>
+  <div class="links">
+    <a href="#features">Features</a><a href="#privacy">Privacy</a><a href="#install">Install</a>
+    <a class="gh" href="https://github.com/hystericmoon/cellar"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>GitHub</a>
+  </div>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <svg class="big-door mark" viewBox="0 0 56 54" role="img" aria-label="The Cellar door">
+    <path class="door" d="M0 54V28A28 28 0 0 1 56 28V54Z"/>
+    <rect class="step" x="5.5" y="47.5" width="45" height="5" rx="2.5"/>
+    <rect class="step" x="10.5" y="39.5" width="35" height="5" rx="2.5"/>
+    <rect class="step" x="15.5" y="31.5" width="25" height="5" rx="2.5"/>
+    <rect class="step" x="20.5" y="23.5" width="15" height="5" rx="2.5"/>
+  </svg>
+  <h1>Your Android phone,<br><em>on your Mac.</em></h1>
+  <p class="lede">Browse, copy and back up everything on your phone, by cable or Wi-Fi. A real Mac app, free and open source. Nothing leaves your Mac.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/hystericmoon/cellar/releases/latest/download/Cellar.dmg"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v9M4 7.5 8 11.5l4-4M2.5 14h11"/></svg>Get Cellar for Mac</a>
+    <a class="btn ghost" href="https://github.com/hystericmoon/cellar">View source</a>
+  </div>
+  <p class="meta">Free · macOS 12 or later · Apple silicon and Intel · <a href="#install">How to install</a></p>
+  <div class="picker" role="group" aria-label="Door colour">
+    <span>Pick a door</span>
+    <button style="--c:#f5f5f5" data-door="graphite" aria-label="Graphite" aria-pressed="true"></button>
+    <button style="--c:#a855f7" data-door="violet" aria-label="Violet" aria-pressed="false"></button>
+    <button style="--c:#3b82f6" data-door="midnight" aria-label="Midnight" aria-pressed="false"></button>
+    <button style="--c:#22c55e" data-door="forest" aria-label="Forest" aria-pressed="false"></button>
+    <button style="--c:#f97316" data-door="ember" aria-label="Ember" aria-pressed="false"></button>
+  </div>
+
+  <div class="shot" id="shot"><div class="win" aria-hidden="true">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <div class="app">
+      <div class="side">
+        <svg class="wm" viewBox="0 -4.05 365.2 71.55"><use href="#wm"/></svg>
+        <div class="dev"><b>Galaxy A55</b><small>USB · 82% · 141 GB free</small></div>
+        <p>Home</p>
+        <h6>Favorites</h6>
+        <p class="on" style="--k:#8a8a8a">Internal storage</p>
+        <p style="--k:#f59e0b">Camera</p>
+        <p style="--k:#ec4899">Pictures</p>
+        <p style="--k:#3b82f6">Downloads</p>
+        <p style="--k:#22c55e">Documents</p>
+        <h6>Tools</h6>
+        <p>Photo backup</p><p>Free up space</p><p>Mirror screen</p>
+      </div>
+      <div class="main">
+        <div class="crumbs">Internal storage <span>›</span> <b>DCIM</b></div>
+        <div class="grid">
+          <div class="tile"><div class="th"><div class="fold" style="--k:#f59e0b"></div></div><small>Camera</small></div>
+          <div class="tile"><div class="th"><div class="fold" style="--k:#ec4899"></div></div><small>Screenshots</small></div>
+          <div class="tile"><div class="th"><div class="fold" style="--k:#3b82f6"></div></div><small>Videos</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(135deg,#f97316,#be185d)"></div><small>IMG_2041.jpg</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(160deg,#0ea5e9,#1e3a8a)"></div><small>IMG_2042.jpg</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(200deg,#84cc16,#14532d)"></div><small>IMG_2043.jpg</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(120deg,#fde68a,#b45309)"></div><small>IMG_2044.heic</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(180deg,#a78bfa,#312e81)"></div><small>VID_2045.mp4</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(140deg,#fb7185,#7f1d1d)"></div><small>IMG_2046.jpg</small></div>
+          <div class="tile"><div class="th ph" style="--g:linear-gradient(170deg,#5eead4,#134e4a)"></div><small>IMG_2047.jpg</small></div>
+        </div>
+        <div class="toast">Copying 248 photos to your Mac<div class="pb"><i></i></div></div>
+      </div>
+    </div>
+  </div></div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <p class="eyebrow">// what it does</p>
+  <h2 class="reveal">Everything Android File Transfer should have been.</h2>
+  <p class="sub reveal">A proper file manager, with the shortcuts your hands already know.</p>
+  <div class="bento">
+    <div class="card w4 reveal">
+      <div class="viz"><div class="flow"><div class="dev-ic"></div><div class="dots"><i></i><i></i><i></i><i></i></div><div class="mac-ic"></div></div></div>
+      <h3>Drag, drop, done</h3>
+      <p>Drag from Finder onto any folder. Cut, copy, paste, undo. Transfers run in a queue with speed and time left, and you keep browsing while they go.</p>
+    </div>
+    <div class="card reveal">
+      <div class="k"><kbd>⌘C</kbd><kbd>⌘V</kbd><kbd>⌥⌘V</kbd><kbd>⌘Z</kbd><kbd>Space</kbd></div>
+      <h3>Feels like Finder</h3>
+      <p>Quick Look with Space, rename with F2, and a Trash you can undo for 30 days.</p>
+    </div>
+    <div class="card w3 reveal">
+      <div class="viz"><div class="photos">
+        <i style="--g:#f97316"></i><i style="--g:#0ea5e9"></i><i style="--g:#84cc16"></i><i style="--g:#eab308"></i><i style="--g:#a78bfa"></i><i style="--g:#fb7185"></i><i style="--g:#5eead4"></i><i style="--g:#f43f5e"></i>
+        <i style="--g:#38bdf8"></i><i style="--g:#facc15"></i><i style="--g:#4ade80"></i><i style="--g:#c084fc"></i><i style="--g:#fb923c"></i><i style="--g:#2dd4bf"></i><i style="--g:#e879f9"></i><i style="--g:#60a5fa"></i>
+      </div></div>
+      <h3>Photo backup that skips what you have</h3>
+      <p>Copies only new photos and videos, converts HEIC to JPG if you like, and can run by itself when you plug in.</p>
+    </div>
+    <div class="card w3 reveal">
+      <div class="viz"><div class="finder"><p>Macintosh HD</p><p>iCloud Drive</p><p class="on">Galaxy A55</p><p>Network</p></div></div>
+      <h3>Right there in Finder</h3>
+      <p>Your phone shows up under Locations. Finder's own copy, paste and Quick Look work on it, no extra drivers.</p>
+    </div>
+    <div class="card reveal"><h3>Wi-Fi, no cable</h3><p>Pair once with a code or QR. Cellar reconnects by itself.</p></div>
+    <div class="card reveal"><h3>Mirror and control</h3><p>Your phone's screen on your Mac, with sound, a real keyboard and recording.</p></div>
+    <div class="card reveal"><h3>Free up space</h3><p>See what's big, find duplicates, save to your Mac and clear the phone.</p></div>
+  </div>
+</div></section>
+
+<div class="band" id="privacy"><div class="wrap">
+  <div>
+    <p class="eyebrow">// privacy</p>
+    <p class="addr reveal" style="margin-top:14px">127.0.0.<span>1</span></p>
+    <p class="sub reveal">That's the only address Cellar talks to. It runs a small server on your own Mac and speaks to your phone over the cable or your Wi-Fi.</p>
+  </div>
+  <div class="facts reveal">
+    <p>No account, no sign-in, no cloud.</p>
+    <p>No analytics or tracking of any kind.</p>
+    <p>Open source: read every line on GitHub.</p>
+    <p>Deletes go to a Trash you can undo, never straight to gone.</p>
+  </div>
+</div></div>
+
+<section id="install"><div class="wrap">
+  <p class="eyebrow">// install</p>
+  <h2 class="reveal">Open the door in three steps.</h2>
+  <div class="steps">
+    <div class="st reveal"><h3>Download and drag</h3><p><a href="https://github.com/hystericmoon/cellar/releases/latest/download/Cellar.dmg">Download Cellar.dmg</a>, open it, and drag Cellar into Applications. One download for Apple silicon and Intel Macs.</p></div>
+    <div class="st reveal"><h3>Open it the first time</h3><p>Cellar is free and isn't signed with a paid Apple developer account yet, so macOS asks once:</p>
+      <ol class="ol"><li>Open Cellar. When macOS says it can't verify it, click <b>Done</b>.</li><li>Go to <b>System Settings › Privacy &amp; Security</b>.</li><li>Scroll down and click <b>Open Anyway</b>, then confirm.</li></ol>
+      <p class="fine">After that it opens like any other app. If macOS offers to install its free Command Line Tools, accept: Cellar uses the Python that comes with them.</p></div>
+    <div class="st reveal"><h3>Plug in your phone</h3><p>On the phone: Settings › About phone › tap <b>Build number</b> seven times, then Developer options › <b>USB debugging</b>. Plug in and tap <b>Allow</b>. Cellar offers to download Android's tools if your Mac doesn't have them.</p></div>
+  </div>
+  <p class="meta" style="text-align:left;margin-top:28px">Rather build it yourself? <code>git clone https://github.com/hystericmoon/cellar</code>, then double-click <b>Build Mac App.command</b>. A copy built on your Mac opens without the Open Anyway step.</p>
+</div></section>
+
+<div class="end"><div class="wrap">
+  <svg class="mark" viewBox="0 0 56 54" aria-hidden="true"><use href="#door"/></svg>
+  <h2 style="margin:0 auto;max-width:16ch">Everything on your phone. One door away.</h2>
+  <div class="cta">
+    <a class="btn primary" href="#install">Get Cellar for Mac</a>
+    <a class="btn ghost" href="https://github.com/hystericmoon/cellar">Star on GitHub</a>
+  </div>
+</div></div>
+
+<footer><div class="wrap">
+  <span>Cellar · free and open source · not affiliated with Google or Apple</span>
+  <span><a href="https://github.com/hystericmoon/cellar">GitHub</a> · <a href="https://github.com/hystericmoon/cellar/releases">Releases</a> · <a href="https://github.com/hystericmoon/cellar/issues">Report a problem</a></span>
+</div></footer>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="wm" viewBox="0 -4.05 365.2 71.55"><path class="door" fill-rule="evenodd" transform="translate(0 -4.05) scale(1.3250)" d="M0 54V28A28 28 0 0 1 56 28V54ZM8 47.5H48A2.5 2.5 0 0 1 48 52.5H8A2.5 2.5 0 0 1 8 47.5ZM13 39.5H43A2.5 2.5 0 0 1 43 44.5H13A2.5 2.5 0 0 1 13 39.5ZM18 31.5H38A2.5 2.5 0 0 1 38 36.5H18A2.5 2.5 0 0 1 18 31.5ZM23 23.5H33A2.5 2.5 0 0 1 33 28.5H23A2.5 2.5 0 0 1 23 23.5Z"/><path fill="#f5f5f5" transform="translate(94.45 0)" d="M38.11574300130208 68.70369466145833Q27.796305338541664 68.70369466145833 20.111124674479164 64.41202799479166Q12.425944010416666 60.120361328125 8.208353678385416 52.261566162109375Q3.9907633463541665 44.40277099609375 3.9907633463541665 33.85184733072917Q3.9907633463541665 23.21759033203125 8.208353678385416 15.400461832682293Q12.425944010416666 7.583333333333336 20.111124674479164 3.291666666666668Q27.796305338541664 -1.0 38.11574300130208 -1.0Q46.29164632161458 -1.0 52.615702311197914 1.7638753255208357Q58.93975830078125 4.527750651041671 62.99299112955729 9.719858805338546Q67.04622395833333 14.911966959635421 68.25919596354166 22.189717610677086H55.16682942708333Q54.04180908203125 16.45819091796875 49.54871622721354 13.316965738932293Q45.05562337239583 10.175740559895836 38.11574300130208 10.175740559895836Q28.120279947916664 10.175740559895836 22.3656005859375 16.472086588541668Q16.610921223958332 22.7684326171875 16.610921223958332 33.85184733072917Q16.610921223958332 44.935262044270836 22.3656005859375 51.23160807291667Q28.120279947916664 57.5279541015625 38.11574300130208 57.5279541015625Q45.05562337239583 57.5279541015625 49.54871622721354 54.386728922526046Q54.04180908203125 51.245503743489586 55.16682942708333 45.51397705078125H68.25919596354166Q67.04622395833333 52.740804036458336 62.99299112955729 57.9583740234375Q58.93975830078125 63.175944010416664 52.615702311197914 65.9398193359375Q46.29164632161458 68.70369466145833 38.11574300130208 68.70369466145833ZM97.86481933593748 68.5Q89.84168701171873 68.5 83.92040201822915 65.29166666666667Q77.99911702473958 62.083333333333336 74.78847452799478 56.19212849934896Q71.57783203124998 50.300923665364586 71.57783203124998 42.333333333333336Q71.57783203124998 34.365743001302086 74.7375508626302 28.574076334635418Q77.8972696940104 22.78240966796875 83.70975952148436 19.641204833984375Q89.52224934895833 16.5 97.3787150065104 16.5Q105.02220865885415 16.5 110.5453409830729 19.476847330729168Q116.06847330729165 22.453694661458336 119.04532063802083 27.958312988281254Q122.02216796874998 33.46293131510417 122.02216796874998 41.087910970052086V45.45361328125H83.50819091796873Q84.19798990885415 51.745381673177086 87.91331176757811 55.127390543619796Q91.62863362630208 58.5093994140625 97.78148600260415 58.5093994140625Q102.38337402343748 58.5093994140625 105.25841471354165 56.81261189778646Q108.13345540364583 55.11582438151042 109.29550374348958 51.666707356770836H121.7767862955729Q120.06381429036458 59.60650634765625 113.75596313476561 64.05325317382812Q107.44811197916665 68.5 97.86481933593748 68.5ZM83.82301025390623 37.00927734375H110.11032307942708Q109.42514241536458 31.837910970052086 106.14963989257811 29.131846110026043Q102.87413736979165 26.42578125 97.39722900390623 26.42578125Q91.9712443033854 26.42578125 88.45499877929686 29.157307942708336Q84.93875325520833 31.88883463541667 83.82301025390623 37.00927734375ZM130.1556233723958 67.5V-2.5H142.57208658854165V67.5ZM153.78895670572913 67.5V-2.5H166.20541992187498V67.5ZM192.8527709960937 68.41666666666667Q184.1120483398437 68.41666666666667 179.15140584309893 64.15740966796875Q174.19076334635412 59.898152669270836 174.19076334635412 52.92594401041667Q174.19076334635412 45.60650634765625 179.25556233723955 41.61345418294271Q184.32036132812496 37.62040201822917 193.79718831380205 37.62040201822917H208.99638671874996V35.592610677083336Q208.99638671874996 26.42578125 198.35273030598955 26.42578125Q189.32485758463537 26.42578125 187.43132324218746 32.88883463541667H175.0518880208333Q176.57502034505205 24.90738932291667 182.59584350585934 20.703694661458336Q188.61666666666662 16.5 198.3990356445312 16.5Q209.32955729166662 16.5 215.10268961588537 21.476847330729168Q220.87582194010412 26.453694661458336 220.87582194010412 35.9259033203125V55.0927734375H226.7461018880208V67.5H214.00554199218746V59.49076334635417H210.50554199218746Q207.92220865885412 63.731486002604164 203.54256998697912 66.07407633463542Q199.16293131510412 68.41666666666667 192.8527709960937 68.41666666666667ZM194.66754964192705 58.86124674479167Q198.75554199218746 58.86124674479167 202.00094401041662 57.31955973307292Q205.2463460286458 55.77787272135417 207.12136637369787 53.141265869140625Q208.99638671874996 50.504659016927086 208.99638671874996 47.28702799479167V46.06473795572917H194.43144531249996Q186.0053792317708 46.06473795572917 186.0053792317708 52.33799235026042Q186.0053792317708 55.402852376302086 188.31560058593746 57.132049560546875Q190.62582194010412 58.86124674479167 194.66754964192705 58.86124674479167ZM238.24999999999997 67.5V29.9072265625H232.04638671874997V17.5H244.7869466145833V27.1759033203125H248.2869466145833Q250.30084228515622 22.148152669270836 254.65038045247394 19.555562337239586Q258.99991861979163 16.962972005208336 264.59252929687494 16.962972005208336H268.77770996093744V27.70353190104167H264.02309163411456Q257.2082316080729 27.70353190104167 253.8355000813802 31.606343587239586Q250.46276855468747 35.5091552734375 250.46276855468747 41.9814453125V67.5Z"/></symbol>
+</defs></svg>
+
+<script>
+(function () {
+  const root = document.documentElement;
+  const pick = document.querySelectorAll(".picker button");
+  function setDoor(name) {
+    if (name === "graphite") delete root.dataset.door; else root.dataset.door = name;
+    pick.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.door === name)));
+    try { localStorage.setItem("cellar-door", name); } catch (e) {}
+  }
+  pick.forEach(b => b.addEventListener("click", () => setDoor(b.dataset.door)));
+  try { const saved = localStorage.getItem("cellar-door"); if (saved) setDoor(saved); } catch (e) {}
+
+  const nav = document.getElementById("nav");
+  addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), {passive: true});
+
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), {threshold: .15});
+  document.querySelectorAll(".reveal, #shot").forEach(el => io.observe(el));
+})();
+</script>
+</body>
+</html>

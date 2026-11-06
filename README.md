@@ -1,6 +1,15 @@
-# Cellar
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/assets/cellar-wordmark-white.svg">
+    <img src="brand/assets/cellar-wordmark-black.svg" alt="Cellar" height="56">
+  </picture>
+</p>
 
-Your Android phone, on your Mac. Browse, preview, copy, move and back up files, by cable or Wi-Fi.
+<p align="center"><b>Your Android phone, on your Mac.</b><br>
+<a href="https://hystericmoon.github.io/cellar/">Website</a> · <a href="https://github.com/hystericmoon/cellar/releases/latest">Download</a> · <a href="brand/BRAND.md">Brand</a></p>
+
+
+Browse, preview, copy, move and back up files, by cable or Wi-Fi.
 Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 
 ## Get started
@@ -8,14 +17,18 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 1. **On the phone (once):** Settings › About phone › tap **Build number** 7 times, then
    Settings › System › Developer options › turn on **USB debugging**. Plug in and tap **Allow**.
 2. **On the Mac, pick one:**
-   - **Mac app (recommended):** double-click **Build Mac App.command**. It builds `Cellar.app`
-     (a menu bar icon plus a window) and offers to move it to Applications. It needs Apple's free
-     Command Line Tools, which the script offers to install. No Apple developer account is needed.
-   - **Browser version:** double-click **Start Cellar.command**. It opens in your browser.
+   - **Download (easiest):** get [Cellar.dmg](https://github.com/hystericmoon/cellar/releases/latest/download/Cellar.dmg)
+     (Apple silicon and Intel), open it and drag Cellar into Applications.
+     Cellar isn't signed with a paid Apple developer account yet, so the first time:
+     1. Open Cellar. When macOS says it can't verify it, click **Done**.
+     2. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**, then confirm.
 
-   Build it yourself rather than using the ready-made zip from the Releases page. A downloaded
-   copy isn't signed by an Apple developer account, so macOS may hold it up to a minute at launch
-   or block it. A copy built on your Mac starts in about a second.
+     After that it opens normally. If macOS offers to install its free Command Line Tools, accept:
+     Cellar runs on the Python that comes with them.
+   - **Build it yourself:** double-click **Build Mac App.command**. It builds `Cellar.app`
+     and offers to move it to Applications. It needs Apple's free Command Line Tools, which the
+     script offers to install. A copy built on your Mac skips the Open Anyway step.
+   - **Browser version:** double-click **Start Cellar.command**. It opens in your browser.
 
    If macOS blocks a `.command` file the first time, right-click it and choose Open. If it's not
    allowed to run, run `chmod +x *.command` in this folder.

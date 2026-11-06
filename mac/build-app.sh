@@ -14,17 +14,27 @@ if ! command -v swiftc >/dev/null 2>&1; then
   exit 1
 fi
 
-ARCH="$(uname -m)"
-echo "Building Cellar.app for $ARCH…"
+# UNIVERSAL=1 builds for both Apple silicon and Intel (used for the downloadable DMG).
+# CELLAR_VERSION sets the version shown in Finder (default: today's date).
+# NO_INSTALL=1 skips the "move to Applications" question.
+if [ "${UNIVERSAL:-0}" = 1 ]; then ARCHS="arm64 x86_64"; else ARCHS="$(uname -m)"; fi
+echo "Building Cellar.app for $ARCHS…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -O -target "$ARCH-apple-macos12.0" \
-  -framework Cocoa -framework WebKit -framework ServiceManagement \
-  -o "$APP/Contents/MacOS/Cellar" Cellar.swift
+BINS=()
+for ARCH in $ARCHS; do
+  swiftc -O -target "$ARCH-apple-macos12.0" \
+    -framework Cocoa -framework WebKit -framework ServiceManagement \
+    -o "$APP/Contents/MacOS/Cellar-$ARCH" Cellar.swift
+  BINS+=("$APP/Contents/MacOS/Cellar-$ARCH")
+done
+lipo -create "${BINS[@]}" -output "$APP/Contents/MacOS/Cellar"
+rm -f "${BINS[@]}"
 
 cp "$ROOT/cellar.py" "$ROOT/ui.html" "$APP/Contents/Resources/"
 cp -R "$ROOT/fonts" "$APP/Contents/Resources/fonts"
+cp MenubarTemplate.png MenubarTemplate@2x.png MenubarOffTemplate.png MenubarOffTemplate@2x.png "$APP/Contents/Resources/"
 # If this folder came from a downloaded zip, the copied files carry macOS's download flag, and an
 # app holding flagged files can stall at launch. This app was just built here, so drop the flag.
 xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
@@ -32,7 +42,7 @@ if command -v iconutil >/dev/null 2>&1; then
   iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 fi
 
-VERSION="$(date +%Y.%m.%d)"
+VERSION="${CELLAR_VERSION:-$(date +%Y.%m.%d)}"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -58,6 +68,7 @@ PLIST
 codesign --force --deep --sign - "$APP"
 echo
 echo "Built: $APP"
+[ "${NO_INSTALL:-0}" = 1 ] && exit 0
 read -r -p "Move it to your Applications folder? [Y/n] " answer
 if [[ "${answer:-Y}" =~ ^[Yy]$ ]]; then
   rm -rf "/Applications/Cellar.app"

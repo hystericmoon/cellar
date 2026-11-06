@@ -215,13 +215,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
 
     private func setIcon(connected: Bool) {
         guard let button = statusItem.button else { return }
-        let names = connected ? ["candybarphone", "iphone"] : ["iphone.slash", "iphone"]
-        for n in names {
-            if let img = NSImage(systemSymbolName: n, accessibilityDescription: connected ? "Cellar: phone connected" : "Cellar: no phone") {
-                img.isTemplate = true
-                button.image = img
-                break
-            }
+        let desc = connected ? "Cellar: phone connected" : "Cellar: no phone"
+        // The Cellar door: filled when a phone is connected, outlined when not (brand/make_brand.py).
+        if let img = Bundle.main.image(forResource: connected ? "MenubarTemplate" : "MenubarOffTemplate") {
+            img.size = NSSize(width: 18, height: 18)
+            img.isTemplate = true
+            img.accessibilityDescription = desc
+            button.image = img
+        } else if let img = NSImage(systemSymbolName: connected ? "iphone" : "iphone.slash", accessibilityDescription: desc) {
+            img.isTemplate = true
+            button.image = img
         }
         button.toolTip = "Cellar: " + statusLine
     }

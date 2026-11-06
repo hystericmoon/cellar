@@ -1,0 +1,31 @@
+name: release
+# Push a tag like v0.2.0 to build the universal app, wrap it in the DMG and publish a release.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dmgbuild
+        run: pip3 install --break-system-packages dmgbuild || pip3 install dmgbuild
+      - name: Build the DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mac/make-dmg.sh "$VERSION"
+          cp "dist/Cellar-$VERSION.dmg" dist/Cellar.dmg
+          (cd dist && shasum -a 256 Cellar.dmg > Cellar.dmg.sha256)
+          lipo -archs Cellar.app/Contents/MacOS/Cellar
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/Cellar.dmg dist/Cellar.dmg.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/Cellar.dmg dist/Cellar.dmg.sha256 \
+              --title "Cellar ${GITHUB_REF_NAME#v}" --notes-file .github/release-notes.md --generate-notes
+          fi
