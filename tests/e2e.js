@@ -142,7 +142,9 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
   });
   await step('dupes', async () => {
     const D = R + '/Documents'; fs.writeFileSync(D + '/dupA.bin', 'A'.repeat(5000)); fs.writeFileSync(D + '/dupB.bin', 'A'.repeat(5000)); fs.utimesSync(D + '/dupA.bin', 1700000000, 1700000000);
-    await p.goto('http://127.0.0.1:8765/#:dupes'); await p.waitForSelector('#dpTot', {timeout:30000});
+    // A full reload first: going to "/#:dupes" from "/#:space" only changes the hash and would keep the last step's toasts.
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#hmSt');
+    await p.evaluate(() => { location.hash = ':dupes'; }); await p.waitForSelector('#dpTot', {timeout:30000});
     ok(await p.getAttribute('#library button[data-lib=space]', 'aria-current') === 'true', 'Duplicates sits under Free up space in the sidebar');
     const g = p.locator('fieldset.group', {hasText: 'dupA.bin'});
     ok(await g.locator('label.dupe').count() === 2 && await g.locator('input:checked').count() === 1, 'duplicate group lists both copies, one kept');
@@ -151,7 +153,11 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await g.locator('label.dupe').nth(1).locator('input').check();
     ok((await g.locator('label.dupe').nth(0).textContent()).includes('Move to Trash'), 'choosing the other copy flips the plan');
     await g.locator('label.dupe').nth(0).locator('input').check();
-    await p.click('#dpGo'); await p.waitForSelector('#confirm[open]'); await p.click('#cnOk'); await p.waitForSelector('.toast:has-text("Trash")', {timeout:20000});
+    await p.click('#dpGo'); await p.waitForSelector('#confirm[open]'); await p.click('#cnOk');
+    await p.waitForSelector('.toast:has-text("Trash")', {timeout:20000});
+    const errToast = await p.$$eval('.toast.err', t => t.map(x => x.textContent).join(' | '));
+    if (errToast) ok(false, 'move to Trash reported: ' + errToast);
+    await p.waitForSelector('.toast:not(.err):has-text("Moved")', {timeout:20000});
     ok(fs.existsSync(D + '/dupA.bin') && !fs.existsSync(D + '/dupB.bin'), 'only the extra copy moved to the Trash');
     ok(fs.readdirSync(R + '/.CellarTrash').some(n => n.endsWith('__dupB.bin')), 'duplicate is in the Cellar Trash');
     fs.unlinkSync(D + '/dupA.bin');
@@ -181,7 +187,7 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     ok((await p.textContent('.state h1')).includes('won’t share') && !(await p.$('#smGo')), 'refusing phone gets a plain explanation');
   });
   await step('camera', async () => {
-    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('table, .grid, .state');
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#hmSt, .state');
     let posted = null;
     await p.route('**/api/tools*', r => r.fulfill({json:{adb:'/x/adb', scrcpy:'/x/scrcpy', scrcpy_version:[2,4], mac:true}}));
     await p.route('**/api/mirror*', r => { posted = JSON.parse(r.request().postData() || '{}'); r.fulfill({json:{running:true}}); });
