@@ -25,6 +25,9 @@ swiftc -O -target "$ARCH-apple-macos12.0" \
 
 cp "$ROOT/cellar.py" "$ROOT/ui.html" "$APP/Contents/Resources/"
 cp -R "$ROOT/fonts" "$APP/Contents/Resources/fonts"
+# If this folder came from a downloaded zip, the copied files carry macOS's download flag, and an
+# app holding flagged files can stall at launch. This app was just built here, so drop the flag.
+xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
 if command -v iconutil >/dev/null 2>&1; then
   iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 fi

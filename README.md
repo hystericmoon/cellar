@@ -13,6 +13,10 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
      Command Line Tools, which the script offers to install. No Apple developer account is needed.
    - **Browser version:** double-click **Start Cellar.command**. It opens in your browser.
 
+   Build it yourself rather than using the ready-made zip from the Releases page. A downloaded
+   copy isn't signed by an Apple developer account, so macOS may hold it up to a minute at launch
+   or block it. A copy built on your Mac starts in about a second.
+
    If macOS blocks a `.command` file the first time, right-click it and choose Open. If it's not
    allowed to run, run `chmod +x *.command` in this folder.
 3. If the Android tools (adb) aren't installed, Cellar shows a **Download Android tools**

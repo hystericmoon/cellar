@@ -6,7 +6,7 @@ Updated 2026-11-06. Branch `feature/handoff-build` (same as `main`, latest commi
 - **Released:** Cellar 0.1.0 at https://github.com/hystericmoon/cellar/releases/tag/v0.1.0 with `Cellar-0.1.0-arm64.zip` (ad-hoc signed, Apple silicon only). The release notes cover install, the Gatekeeper right-click → Open step, `adb`/`scrcpy` requirements, and a troubleshooting section for the "not responding" launch hang (`xattr -dr com.apple.quarantine /Applications/Cellar.app`).
 - **Merged:** PRs hystericmoon/cellar#1, hystericmoon/cellar#2 and hystericmoon/cellar#3 are all merged. `main` matches the feature branch.
 - **CI green** at the last run: API 135, Browser 71.
-- **Installed app:** only `/Applications/Cellar.app` (the release download). The project-folder build was deleted; rebuild with `Build Mac App.command`. The `/Applications` copy needs right-click → Open or the `xattr` command once, because of the quarantine flag.
+- **Installed app:** `/Applications/Cellar.app` is a local build (starts in about 1 s). The downloaded release zip was replaced: macOS's security policy held it about a minute at launch or blocked it ("Security policy would not allow process"), even with the quarantine flag removed. The release notes and README now make building with `Build Mac App.command` the main install, and the build script strips the download flag from its own output, so building from a downloaded source zip is fast too. The real fix for the ready-made zip is a paid Apple Developer ID plus notarization.
 - Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 
 ## Done (all items from the 2026-11-05 list)
