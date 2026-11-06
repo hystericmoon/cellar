@@ -44,6 +44,7 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 ## Brand, site and DMG (2026-11-06)
 - Brand in `brand/`: the cellar door mark (steps are holes; colour follows the theme), Funnel Display wordmark, `make_brand.py` generates every asset plus `mac/AppIcon.iconset` and `mac/Menubar*Template.png`. Guide: `brand/BRAND.md`.
 - App: graphite icon with a white door, menu bar door (filled = connected, outline = no phone), wordmark in the sidebar, favicon recoloured per theme.
+- Live 2026-11-06: site https://hystericmoon.github.io/cellar/ and release v0.2.0 (`Cellar.dmg`, built by CI, universal).
 - Site: `docs/index.html` (GitHub Pages from `/docs`), door colour picker, install steps with Open Anyway.
 - DMG: `mac/make-dmg.sh <version>` builds a universal app and a branded DMG with dmgbuild (create-dmg's Finder scripting didn't save the layout on macOS 26). `.github/workflows/release.yml` does it on a `v*` tag and uploads `Cellar.dmg`. Unsigned: first open needs Open Anyway. Tested 0.2.0 from a Safari-flagged copy: opened fine after Open Anyway.
 - A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
