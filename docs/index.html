@@ -97,7 +97,7 @@ h1 em{font-style:normal;color:var(--door);transition:color .5s var(--ease)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:14px}
 .tile{text-align:center}
 .tile .th{aspect-ratio:1;border-radius:10px;background:#181818;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden}
-.tile .th.ph{background:var(--g)}
+.tile .th.ph img{width:100%;height:100%;object-fit:cover;display:block}
 .fold{width:46%;height:36%;border-radius:4px;background:var(--k);position:relative}
 .fold::before{content:"";position:absolute;left:0;top:-14%;width:42%;height:20%;border-radius:3px 3px 0 0;background:var(--k)}
 .tile small{display:block;margin-top:6px;color:#cfcfcf;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -133,7 +133,7 @@ kbd{font:500 12px var(--mono);border:1px solid var(--line2);border-bottom-width:
 .dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}.dots i:nth-child(4){animation-delay:.6s}
 @keyframes dot{40%{opacity:1}}
 .photos{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:12px;height:100%}
-.photos i{border-radius:4px;background:var(--g)}
+.photos i{border-radius:4px;background:#1a1a1a center/cover no-repeat}
 .finder{padding:14px 16px;font-size:12px;color:#bdbdbd}
 .finder p{display:flex;gap:8px;align-items:center;padding:3px 0}
 .finder p::before{content:"";width:12px;height:10px;border-radius:2px;background:#4a4a4a}
@@ -233,13 +233,13 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
           <div class="tile"><div class="th"><div class="fold" style="--k:#f59e0b"></div></div><small>Camera</small></div>
           <div class="tile"><div class="th"><div class="fold" style="--k:#ec4899"></div></div><small>Screenshots</small></div>
           <div class="tile"><div class="th"><div class="fold" style="--k:#3b82f6"></div></div><small>Videos</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(135deg,#f97316,#be185d)"></div><small>IMG_2041.jpg</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(160deg,#0ea5e9,#1e3a8a)"></div><small>IMG_2042.jpg</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(200deg,#84cc16,#14532d)"></div><small>IMG_2043.jpg</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(120deg,#fde68a,#b45309)"></div><small>IMG_2044.heic</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(180deg,#a78bfa,#312e81)"></div><small>VID_2045.mp4</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(140deg,#fb7185,#7f1d1d)"></div><small>IMG_2046.jpg</small></div>
-          <div class="tile"><div class="th ph" style="--g:linear-gradient(170deg,#5eead4,#134e4a)"></div><small>IMG_2047.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/01.jpg" alt="" loading="lazy"></div><small>IMG_2041.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/02.jpg" alt="" loading="lazy"></div><small>IMG_2042.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/03.jpg" alt="" loading="lazy"></div><small>IMG_2043.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/04.jpg" alt="" loading="lazy"></div><small>IMG_2044.heic</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/05.jpg" alt="" loading="lazy"></div><small>IMG_2045.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/06.jpg" alt="" loading="lazy"></div><small>IMG_2046.jpg</small></div>
+          <div class="tile"><div class="th ph"><img src="img/photos/07.jpg" alt="" loading="lazy"></div><small>IMG_2047.jpg</small></div>
         </div>
         <div class="toast">Copying 248 photos to your Mac<div class="pb"><i></i></div></div>
       </div>
@@ -264,8 +264,8 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
     </div>
     <div class="card w3 reveal">
       <div class="viz"><div class="photos">
-        <i style="--g:#f97316"></i><i style="--g:#0ea5e9"></i><i style="--g:#84cc16"></i><i style="--g:#eab308"></i><i style="--g:#a78bfa"></i><i style="--g:#fb7185"></i><i style="--g:#5eead4"></i><i style="--g:#f43f5e"></i>
-        <i style="--g:#38bdf8"></i><i style="--g:#facc15"></i><i style="--g:#4ade80"></i><i style="--g:#c084fc"></i><i style="--g:#fb923c"></i><i style="--g:#2dd4bf"></i><i style="--g:#e879f9"></i><i style="--g:#60a5fa"></i>
+        <i style="background-image:url(img/photos/01.jpg)"></i><i style="background-image:url(img/photos/02.jpg)"></i><i style="background-image:url(img/photos/03.jpg)"></i><i style="background-image:url(img/photos/04.jpg)"></i><i style="background-image:url(img/photos/05.jpg)"></i><i style="background-image:url(img/photos/06.jpg)"></i><i style="background-image:url(img/photos/07.jpg)"></i><i style="background-image:url(img/photos/08.jpg)"></i>
+        <i style="background-image:url(img/photos/09.jpg)"></i><i style="background-image:url(img/photos/10.jpg)"></i><i style="background-image:url(img/photos/11.jpg)"></i><i style="background-image:url(img/photos/12.jpg)"></i><i style="background-image:url(img/photos/13.jpg)"></i><i style="background-image:url(img/photos/14.jpg)"></i><i style="background-image:url(img/photos/15.jpg)"></i><i style="background-image:url(img/photos/16.jpg)"></i>
       </div></div>
       <h3>Photo backup that skips what you have</h3>
       <p>Copies only new photos and videos, converts HEIC to JPG if you like, and can run by itself when you plug in.</p>
@@ -318,7 +318,7 @@ footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--text
 </div></div>
 
 <footer><div class="wrap">
-  <span>Cellar · free and open source · not affiliated with Google or Apple</span>
+  <span>Cellar · free and open source · not affiliated with Google or Apple · photos from <a href="https://unsplash.com">Unsplash</a></span>
   <span><a href="https://github.com/hystericmoon/cellar">GitHub</a> · <a href="https://github.com/hystericmoon/cellar/releases">Releases</a> · <a href="https://github.com/hystericmoon/cellar/issues">Report a problem</a></span>
 </div></footer>
 
