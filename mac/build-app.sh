@@ -18,7 +18,7 @@ fi
 # CELLAR_VERSION sets the version shown in Finder (default: today's date).
 # NO_INSTALL=1 skips the "move to Applications" question.
 if [ "${UNIVERSAL:-0}" = 1 ]; then ARCHS="arm64 x86_64"; else ARCHS="$(uname -m)"; fi
-echo "Building Cellar.app for $ARCHS…"
+echo "Building Cellar.app for ${ARCHS}…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
