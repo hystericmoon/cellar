@@ -5,6 +5,7 @@
 import Cocoa
 import WebKit
 import ServiceManagement
+import Network
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDelegate, WKNavigationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem!
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
     private var serial: String?
     private var connected = false
     private var lastLog = ""
+    private var lanBrowser: NWBrowser?
 
     // MARK: life cycle
 
@@ -27,8 +29,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        requestLocalNetwork()
         startServer()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in self?.poll() }
+    }
+
+    /// Unmounts this server's Finder mounts ("http://127.0.0.1:<port>/dav/… on /Volumes/…").
+    private func unmountFinder(port: Int) {
+        let list = Process()
+        list.executableURL = URL(fileURLWithPath: "/sbin/mount")
+        let out = Pipe()
+        list.standardOutput = out
+        guard (try? list.run()) != nil else { return }
+        list.waitUntilExit()
+        let text = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        for line in text.split(separator: "\n") where line.hasPrefix("http://127.0.0.1:\(port)/dav/") {
+            guard let on = line.range(of: " on "), let paren = line.range(of: " (webdav", range: on.upperBound..<line.endIndex) else { continue }
+            let mp = String(line[on.upperBound..<paren.lowerBound])
+            let u = Process()
+            u.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+            u.arguments = ["unmount", "force", mp]
+            u.standardOutput = FileHandle.nullDevice
+            u.standardError = FileHandle.nullDevice
+            guard (try? u.run()) != nil else { continue }
+            let deadline = Date().addingTimeInterval(10)   // about 3 s when a Finder window shows the phone
+            while u.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
+            if u.isRunning { u.terminate() }
+        }
+    }
+
+    /// macOS only lets an app reach devices on the Wi-Fi once the person allows "Local Network" for it,
+    /// and adb (started by this app) inherits that. Without it, Go wireless fails with "No route to host".
+    /// Browsing for phones with Wireless debugging on makes macOS ask, in Cellar's name, at launch.
+    private func requestLocalNetwork() {
+        let b = NWBrowser(for: .bonjour(type: "_adb-tls-connect._tcp", domain: nil), using: .tcp)
+        b.stateUpdateHandler = { _ in }
+        b.start(queue: .main)
+        lanBrowser = b
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.lanBrowser?.cancel(); self?.lanBrowser = nil }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -37,7 +75,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        server?.terminate()
+        // Unmount the phone from Finder while the server can still answer: a mount whose server is
+        // gone makes Finder hang. Then stop the server and wait for it, so opening Cellar again right
+        // away finds port 8765 free instead of moving to another port.
+        guard let s = server else { return }
+        if let port = baseURL?.port { unmountFinder(port: port) }
+        s.terminate()
+        let deadline = Date().addingTimeInterval(8)
+        while s.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
     }
 
     // MARK: server

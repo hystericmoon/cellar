@@ -15,6 +15,8 @@ import posixpath
 import re
 import secrets
 import shlex
+import signal
+import socket
 import shutil
 import subprocess
 import sys
@@ -2555,15 +2557,77 @@ def dav_invalidate(serial, *paths):
                 _dav_cache.pop((serial, k), None)
 
 
+def dav_mounts():
+    """Cellar's Finder mounts: [(port, mountpoint)], from any Cellar server, past or present."""
+    out = subprocess.run(["mount"], capture_output=True, text=True, timeout=10).stdout
+    found = []
+    for line in out.splitlines():
+        m = re.match(r"http://127\.0\.0\.1:(\d+)/dav/.* on (.+?) \(webdav", line)
+        if m:
+            found.append((int(m.group(1)), m.group(2)))
+    return found
+
+
+def port_alive(port):
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def force_unmount(mp):
+    """Unmount one WebDAV mount without hanging. Unmounting alone can wait forever on a mount whose
+    server is gone or busy; stopping its mount_webdav helper first lets it go at once."""
+    # The helper is webdavfs_agent on current macOS (mount_webdav on older); its last argument is the mount point.
+    subprocess.run(["pkill", "-9", "-f", f"(webdavfs_agent|mount_webdav) .* {mp}$"], capture_output=True)
+    try:
+        subprocess.run(["diskutil", "unmount", "force", mp], capture_output=True, timeout=6)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def unmount_dav(own=False):
+    """own=False: unmount Finder mounts left by a Cellar server that is gone (they make Finder hang
+    and block new mounts). own=True, on shutdown: unmount this server's mounts."""
+    if not IS_MAC:
+        return
+    try:
+        for port, mp in dav_mounts():
+            mine = port == SERVER_PORT[0]
+            if (own and mine) or (not own and not mine and not port_alive(port)):
+                force_unmount(mp)
+    except Exception:
+        pass
+
+
+_mount_lock = threading.Lock()
+
+
+FINDER_DIR = os.path.expanduser("~/Library/Application Support/Cellar/Finder")
+
+
 def finder_mount(serial):
+    # One at a time: "show in Finder when it connects" and the button could otherwise mount twice.
+    with _mount_lock:
+        return _finder_mount(serial)
+
+
+def _finder_mount(serial):
     vol = dav_volume_name(serial)
     url = f"http://127.0.0.1:{SERVER_PORT[0]}/dav/{urllib.parse.quote(vol)}/"
     if not IS_MAC:
         return {"url": url, "mounted": False, "note": "Finder is only on macOS"}
+    unmount_dav()
     if finder_mountpoint(vol):
         subprocess.Popen(["open", finder_mountpoint(vol)])
         return {"url": url, "mounted": True}
-    r = subprocess.run(["osascript", "-e", f'mount volume "{url}"'], capture_output=True, text=True, timeout=60)
+    # mount_webdav directly: about 0.7 s, no dialog. `osascript mount volume` goes through macOS's
+    # NetAuth, which asks "Connect as Guest or Registered user?" and, even with that turned off,
+    # waited about 90 s before mounting. /Volumes needs admin rights, so the mount point is ours.
+    point = os.path.join(FINDER_DIR, vol.replace("/", "-"))
+    os.makedirs(point, exist_ok=True)
+    r = subprocess.run(["/sbin/mount_webdav", "-s", "-S", "-v", vol, url, point], capture_output=True, text=True, timeout=60)
     if r.returncode != 0:
         raise AdbError("Finder couldn't connect: " + (r.stderr.strip() or "unknown error"))
     mp = finder_mountpoint(vol)
@@ -2639,7 +2703,17 @@ class DavMixin:
         if body and self.command != "HEAD":
             self.wfile.write(body)
 
+    def parse_request(self):
+        self._body_read = False   # once per request: connections are kept alive between requests
+        return super().parse_request()
+
     def dav_body_to(self, f):
+        # Read the request body exactly once. A reply sent with the body still unread breaks the
+        # kept-alive connection ("connection reset"), and macOS's WebDAV client then waits out its
+        # timeouts: mounting the phone in Finder took about 90 seconds because of this.
+        if getattr(self, "_body_read", False):
+            return
+        self._body_read = True
         if self.headers.get("Transfer-Encoding", "").lower() == "chunked":
             while True:
                 line = self.rfile.readline()
@@ -2694,9 +2768,12 @@ class DavMixin:
         return None
 
     def handle_dav(self):
-        if not self.dav_allowed():
-            return self.dav_send(403, b"Forbidden", "text/plain")
         m = self.command
+        if m != "PUT":   # PUT streams its body to the phone; everything else is read and dropped up front
+            self.dav_drain()
+        if not self.dav_allowed():
+            self.dav_drain()
+            return self.dav_send(403, b"Forbidden", "text/plain")
         if m == "OPTIONS":
             return self.dav_send(200, b"", "text/plain", {"DAV": "1, 2", "MS-Author-Via": "DAV",
                                  "Allow": "OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, COPY, MOVE, LOCK, UNLOCK"})
@@ -3306,7 +3383,26 @@ def watch_parent(pid):
     while True:
         time.sleep(2)
         if os.getppid() != pid:
-            os._exit(0)
+            shutdown()
+
+
+def detach_output():
+    # Our stdout is a pipe to the Mac app. Once the app has quit, writing a log line fails, and every
+    # request would fail with it, including the ones Finder makes while unmounting. Log to nowhere instead.
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+
+
+def shutdown():
+    # The Mac app unmounts the phone from Finder before it stops us (unmounting from here, while
+    # shutting down, could hang). If the app was killed instead, the next launch cleans up the mount.
+    detach_output()
+    os._exit(0)
+
+
+def on_terminate(signum, frame):
+    shutdown()
 
 
 def main():
@@ -3325,6 +3421,7 @@ def main():
         sys.exit("Couldn't find a free port.")
     server.daemon_threads = True
     SERVER_PORT[0] = server.server_address[1]
+    threading.Thread(target=unmount_dav, daemon=True).start()   # mounts left by a server that crashed
     threading.Thread(target=device_watcher, daemon=True).start()
     threading.Thread(target=prune_cache, daemon=True).start()
     url = f"http://127.0.0.1:{server.server_address[1]}/"
@@ -3332,11 +3429,17 @@ def main():
     if not ADB:
         print("  ! Android tools (adb) not found. Cellar can download them for you from its window.")
     else:
+        if parent.isdigit():
+            # Started by the Mac app: restart adb so it runs under this app. macOS gives Local Network
+            # access per app (and per build), and adb inherits it from whoever started it; an adb left
+            # running by an earlier Cellar can't reach phones on the Wi-Fi ("No route to host").
+            subprocess.run([ADB, "kill-server"], capture_output=True, timeout=10)
         subprocess.run([ADB, "start-server"], capture_output=True)
     print("  Files you save go to " + SAVE_DIR)
     print("  Press Ctrl+C to quit.\n")
     if not os.environ.get("CELLAR_NO_BROWSER"):
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+    signal.signal(signal.SIGTERM, on_terminate)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

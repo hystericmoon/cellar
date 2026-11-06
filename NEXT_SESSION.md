@@ -33,6 +33,15 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - `/Applications/Cellar.app` is still the pre-redesign build; the new one is `cellar/Cellar.app` (untracked).
 - Tests: loading "/#:x" from another "#:" page doesn't reload, so old toasts stay; reload with goto('/') first.
 
+## Wireless and Show in Finder fixes (2026-11-06)
+- Go wireless failed with "No route to host": Cellar lacked macOS Local Network permission, and adb inherits it from the app that starts it. Fixed: `NSLocalNetworkUsageDescription` + `NSBonjourServices` in build-app.sh, and the app browses for `_adb-tls-connect._tcp` at launch so macOS asks. Verified: Go wireless connects through Cellar.
+- Show in Finder hung: dead WebDAV mounts (one from a test server on 8775) plus duplicate mounts. Fixed in cellar.py: a lock so auto-mount and the button can't mount twice; mounts whose server is gone are cleaned up at startup and before mounting (kill the mount_webdav helper, then `diskutil unmount force`). The Mac app unmounts its own mount on quit, before stopping the server. Unmounting from inside the server while it shuts down deadlocks: don't. Verified: quit takes about 4 s, leaves no mount, relaunch gets port 8765 back.
+- `osascript mount volume` showed a "Connect as" dialog and blocked until it was answered. NetFS with NoUI/Guest/AllowLoopback avoided the dialog but still waited about 90 s inside NetAuthSysAgent. Now Cellar calls `/sbin/mount_webdav -s -S -v <name>` into `~/Library/Application Support/Cellar/Finder/<name>` (/Volumes needs admin rights): 0.7 s, no dialog, and Finder treats it as a volume. The helper process is `webdavfs_agent` on this macOS.
+- WebDAV replies now read the request body once before answering (an unread body reset kept-alive connections).
+- When started by the Mac app, the server restarts adb so it runs under the current build's Local Network permission. An adb left over from an earlier build can't reach the Wi-Fi. Every ad-hoc rebuild is a new app to macOS's privacy checks.
+- Verified on the phone: auto-mount about 7 s after launch, Show in Finder 0.26 s, quit 4 s with no mount left, Go wireless connects.
+- The segmented List/Grid control was restyled (rounded fill, no square outline).
+
 ## Still open
 1. **Real Finder drag** into Cellar. Only tested with a synthetic drop. Needs the user at the Mac.
 2. **Wireless pairing** failed with "protocol fault" (slow Wi-Fi link, 111–702 ms pings; a WireGuard VPN was on). Workaround: connect by USB and use Cellar's cable-to-Wi-Fi option in the Wi-Fi dialog.

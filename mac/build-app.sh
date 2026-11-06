@@ -50,6 +50,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>NSAppleEventsUsageDescription</key><string>Cellar asks Finder to show your phone under Locations.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Cellar connects to your Android phone over Wi-Fi, so you can use it without a cable.</string>
+  <key>NSBonjourServices</key><array><string>_adb-tls-connect._tcp</string><string>_adb-tls-pairing._tcp</string><string>_adb._tcp</string></array>
 </dict></plist>
 PLIST
 
