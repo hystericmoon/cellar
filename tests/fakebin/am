@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "am $*" >> "$(dirname "$0")/calls.log"; echo "Starting: Intent { act=android.intent.action.SET_ALARM }"

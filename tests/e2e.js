@@ -1,0 +1,236 @@
+const { chromium } = require('playwright'); const fs = require('fs');
+const R = '/storage/emulated/0';
+const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
+(async () => {
+  const b = await chromium.launch(); const ctx = await b.newContext({viewport:{width:1360,height:820}});
+  await ctx.grantPermissions(['clipboard-read','clipboard-write'], {origin:'http://127.0.0.1:8765'});
+  const p = await ctx.newPage(); const errs=[]; p.on('pageerror', x=>errs.push(x.message)); p.on('console', m => m.type()==='error' && !/502|409|400/.test(m.text()) && errs.push(m.text()));
+  const rows = () => p.$$eval('button.name .nm', b => b.map(x => x.textContent));
+  const row = n => `tr:has(button.name:has-text("${n}"))`;
+  const step = async (name, fn) => { try { await fn(); } catch (e) { ok(false, name + ' threw: ' + e.message.split('\n')[0]); await p.screenshot({path:__dirname + '/shots/fail-' + name.replace(/\W+/g,'_') + '.png'}); } };
+  await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('table'); await p.click('[data-view=list]');
+  await p.click('nav button[data-path$="/Download"]'); await p.waitForSelector(row('report.pdf'));
+
+  await step('menu', async () => {
+    await p.click(row('report.pdf') + ' button.name', {button:'right'}); await p.waitForSelector('#ctxmenu:not([hidden])');
+    const items = await p.$$eval('#ctxmenu [role=menuitem]', b => b.map(x => x.firstChild.textContent));
+    ok(items.includes('Cut') && items.includes('Rename') && items.includes('Move to Trash'), 'context menu items: ' + items.join(' | '));
+    ok(await p.evaluate(() => document.activeElement.getAttribute('role') === 'menuitem'), 'focus moves into menu');
+    await p.keyboard.press('ArrowDown'); await p.keyboard.press('Escape');
+    ok(await p.$eval('#ctxmenu', m => m.hidden) && await p.evaluate(() => !!document.activeElement.closest('[data-row]')), 'Esc closes menu, focus returns to row');
+  });
+  await step('copy-conflict', async () => {
+    await p.click(row('report.pdf') + ' button.name', {modifiers:['Control']});
+    await p.keyboard.press('Control+c'); await p.waitForSelector('#hint:not([hidden])');
+    ok((await p.textContent('#hint')).includes('copied'), 'hint shows copied');
+    await p.click('nav button[data-path$="/Documents"]'); await p.waitForSelector(row('notes.txt'));
+    await p.keyboard.press('Control+v'); await p.waitForSelector('#conflict[open]');
+    ok((await p.textContent('#cfTitle')).includes('report.pdf'), 'conflict dialog: ' + await p.textContent('#cfTitle'));
+    await p.screenshot({path:__dirname + '/shots/u2.png'});
+    await p.click('[data-cf=new]'); await p.waitForSelector(row('report 2.pdf'), {timeout:8000});
+    ok(fs.existsSync(R + '/Documents/report 2.pdf'), 'keep both created "report 2.pdf"');
+  });
+  await step('cut-paste-undo', async () => {
+    await p.click(row('notes.txt') + ' button.name', {modifiers:['Control']}); await p.keyboard.press('Control+x');
+    ok(await p.$eval(row('notes.txt'), r => r.classList.contains('cut')), 'cut row is faded');
+    await p.click(row('Work') + ' button.name'); await p.waitForSelector(row('plan.txt'));
+    await p.keyboard.press('Control+v'); await p.waitForSelector(row('notes.txt'), {timeout:8000});
+    ok(fs.existsSync(R + '/Documents/Work/notes.txt') && !fs.existsSync(R + '/Documents/notes.txt'), 'cut + paste moved the file');
+    await p.waitForSelector('.toast:has-text("Moved")'); await p.click('.toast:has-text("Moved") button');
+    await p.waitForTimeout(2500); ok(fs.existsSync(R + '/Documents/notes.txt'), 'Undo moved it back');
+  });
+  await step('rename-newfolder-trash', async () => {
+    await p.click('#crumbs button:has-text("Documents")'); await p.waitForSelector(row('notes.txt'));
+    await p.click(row('notes.txt') + ' button.name', {modifiers:['Control']}); await p.keyboard.press('F2');
+    await p.waitForSelector('input.rename'); await p.keyboard.press('Control+a'); await p.keyboard.type('groceries.txt'); await p.keyboard.press('Enter');
+    await p.waitForSelector(row('groceries.txt')); ok(fs.existsSync(R + '/Documents/groceries.txt'), 'F2 rename');
+    await p.keyboard.press('Control+z'); await p.waitForSelector(row('notes.txt'), {timeout:5000}); ok(fs.existsSync(R + '/Documents/notes.txt'), 'Ctrl+Z undid rename');
+    await p.click('#newFolderBtn'); await p.waitForSelector('input.rename'); await p.keyboard.type('Bali photos'); await p.keyboard.press('Enter');
+    await p.waitForSelector(row('Bali photos')); ok(fs.existsSync(R + '/Documents/Bali photos'), 'new folder + name');
+    await p.click(row('report 2.pdf') + ' button.name', {modifiers:['Control']}); await p.keyboard.press('Control+Backspace');
+    await p.waitForSelector('.toast:has-text("Trash")'); ok(!fs.existsSync(R + '/Documents/report 2.pdf'), 'Ctrl+Backspace moved to Trash');
+    await p.screenshot({path:__dirname + '/shots/u3.png'});
+    await p.click('#library button[data-lib=trash]'); await p.waitForSelector(row('report 2.pdf'));
+    ok((await p.textContent(row('report 2.pdf'))).includes('Documents'), 'Trash shows original location');
+    await p.click(row('report 2.pdf') + ' [data-putback]'); await p.waitForSelector('.toast:has-text("Put back")');
+    ok(fs.existsSync(R + '/Documents/report 2.pdf'), 'Put back restored it');
+  });
+  await step('drag-move', async () => {
+    await p.click('nav button[data-path$="/Documents"]'); await p.waitForSelector(row('Bali photos'));
+    await p.dragAndDrop(row('report 2.pdf'), row('Bali photos')); await p.waitForTimeout(2500);
+    ok(fs.existsSync(R + '/Documents/Bali photos/report 2.pdf'), 'drag onto folder moved the file');
+  });
+  await step('search-recent', async () => {
+    await p.click('#filter'); await p.keyboard.type('invoice'); await p.waitForSelector('#hint:has-text("whole phone")');
+    await p.keyboard.press('Enter'); await p.waitForSelector(row('Invoice-Oct.pdf'));
+    ok((await p.textContent(row('Invoice-Oct.pdf'))).includes('Download'), 'whole-phone search with Where column');
+    await p.click('#library button[data-lib=recent]'); await p.waitForSelector('#crumbs:has-text("Recent")'); await p.waitForTimeout(800); ok((await rows()).length > 3, 'Recent view lists files');
+  });
+  await step('save', async () => {
+    await p.click('#library button[data-lib=recent]'); await p.waitForSelector(row('Invoice-Oct.pdf'));
+    await p.click(row('Invoice-Oct.pdf') + ' [data-save]'); await p.waitForSelector('#txList li:has-text("Invoice-Oct.pdf"):has-text("Done")', {timeout:8000});
+    ok(fs.existsSync(process.env.HOME + '/Downloads/Cellar/Invoice-Oct.pdf'), 'Save to Mac via transfer queue');
+  });
+  await step('upload', async () => {
+    await p.click('nav button[data-path$="/Documents"]'); await p.waitForSelector(row('Work'));
+    await p.setInputFiles('#folderInput', process.argv[2]); await p.waitForSelector(row('SocSaver'), {timeout:10000});
+    ok(fs.existsSync(R + '/Documents/SocSaver/Saved posts/2026/two.jpg'), 'folder upload through staging + push job');
+    await p.setInputFiles('#folderInput', process.argv[2]); await p.waitForSelector('#conflict[open]'); ok((await p.textContent('#cfReplace')) === 'Merge', 'folder conflict offers Merge');
+    await p.click('[data-cf=replace]'); await p.waitForTimeout(2500); ok(!fs.existsSync(R + '/Documents/SocSaver 2'), 'merge did not create a copy');
+    await p.screenshot({path:__dirname + '/shots/u4.png'});
+  });
+  await step('backup-apps', async () => {
+    await p.click('#library button[data-lib=backup]'); await p.waitForSelector('#bkRun');
+    ok(/photo/.test(await p.textContent('#bkNow')), 'backup view: ' + await p.textContent('#bkNow'));
+    await p.screenshot({path:__dirname + '/shots/u5.png'});
+    await p.click('#bkRun'); await p.waitForSelector('#bkNow:has-text("Everything is backed up")', {timeout:10000}); ok(true, 'backup ran, view refreshed');
+    await p.click('#library button[data-lib=apps]'); await p.waitForSelector('[data-appsave]'); ok((await p.$$('[data-appsave]')).length === 2, 'apps listed');
+    await p.screenshot({path:__dirname + '/shots/u6.png'});
+    await p.click('[data-appdel]'); await p.waitForSelector('#confirm[open]'); ok((await p.textContent('#cnTitle')).startsWith('Uninstall'), 'uninstall asks first'); await p.click('#cnCancel');
+  });
+  await step('timeline-mirror', async () => {
+    await p.click('nav button[data-path$="/Camera"]'); await p.waitForSelector('.grid .dayhead'); ok(true, 'Camera opens as photo timeline');
+    await p.screenshot({path:__dirname + '/shots/u7.png'});
+    await p.click('#mirrorBtn'); await p.waitForSelector('#mrInstall'); ok(true, 'mirror offers scrcpy download'); await p.click('#mrClose');
+  });
+  await step('dark-menu', async () => {
+    await p.emulateMedia({colorScheme:'dark'}); await p.click('nav button[data-path$="/Documents"]'); await p.click('[data-view=list]'); await p.waitForSelector(row('Work'));
+    await p.click('#content', {button:'right', position:{x:600, y:560}}); await p.waitForSelector('#ctxmenu:not([hidden])'); await p.screenshot({path:__dirname + '/shots/u8.png'});
+  });
+  await step('restyle', async () => {
+    await p.emulateMedia({colorScheme:'light'}); await p.click('[data-view=list]'); await p.waitForSelector(row('Work'));
+    const css = await p.evaluate(() => { const g = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim(); return {text:g('--text'), muted:g('--muted'), line:g('--line'), accent:g('--accent')}; });
+    ok(css.text === '#09090b' && css.muted === '#71717a' && css.line === '#e4e4e7' && css.accent === '#18181b', 'zinc tokens in light mode');
+    await p.click(row('Work') + ' td.ck input.sel', {force:true});
+    const sel = await p.$eval(row('Work') + ' td:first-child', td => ({shadow:getComputedStyle(td).boxShadow, box:td.querySelector('input.sel').checked}));
+    ok(sel.box && sel.shadow !== 'none', 'selected row has a checkmark and a left border, not just a fill');
+    await p.keyboard.press('Escape');
+    await p.emulateMedia({colorScheme:'dark'}); await p.waitForTimeout(100);
+    ok(await p.evaluate(() => getComputedStyle(document.body).backgroundColor) === 'rgb(9, 9, 11)', 'dark mode is zinc-950');
+    await p.emulateMedia({colorScheme:'light'});
+  });
+  await step('sd-card', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#places button[data-path="/storage/1A2B-3C4D"]', {timeout:8000});
+    ok(await p.textContent('#places button[data-path="/storage/1A2B-3C4D"]') === 'SD card', 'SD card appears in the sidebar');
+    await p.click('#places button[data-path="/storage/1A2B-3C4D"]'); await p.click('[data-view=list]'); await p.waitForSelector(row('Documents'));
+    ok((await p.textContent('#crumbs button')).trim() === 'SD card', 'breadcrumb starts at "SD card"');
+    await p.click(row('Documents') + ' button.name'); await p.waitForSelector(row('sd-notes.txt'));
+    await p.click(row('sd-notes.txt') + ' td.ck input.sel', {force:true}); await p.click('#selTrash'); await p.waitForSelector('.toast:has-text("Trash")');
+    ok(fs.existsSync('/storage/1A2B-3C4D/.CellarTrash') && !fs.existsSync(R + '/.CellarTrash/' + 'x'), 'Trash on the card stays on the card');
+    await p.click('.toast:has-text("Trash") button'); await p.waitForTimeout(2500);
+    ok(fs.existsSync('/storage/1A2B-3C4D/Documents/sd-notes.txt'), 'Undo puts it back on the card');
+    await p.screenshot({path:__dirname + '/shots/sd.png'});
+  });
+  await step('space', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=space]');
+    await p.click('#library button[data-lib=space]'); await p.waitForSelector('#spTot', {timeout:30000});
+    ok((await p.textContent('#spFold')) === 'By folder' && (await p.$$('.legend li')).length >= 3, 'space page shows types and folders');
+    ok((await p.$$eval('[data-sprow] .name span:last-child', n => n[0].textContent)) === 'report.pdf', 'biggest file is first');
+    await p.screenshot({path:__dirname + '/shots/space.png', fullPage:true});
+    await p.click('[data-sprow="0"] input.sel', {force:true});
+    ok(await p.$eval('#spSaveTrash', b => !b.disabled) && (await p.textContent('#spSelText')).includes('1 selected'), 'ticking a file enables clean-up');
+    await p.click('#spSaveTrash'); await p.waitForSelector('#confirm[open]'); ok((await p.textContent('#cnTitle')).includes('then move to Trash'), 'asks before saving and trashing');
+    await p.click('#cnOk'); await p.waitForSelector('.toast:has-text("Trash")', {timeout:20000});
+    const dirs = fs.readdirSync(process.env.HOME + '/Downloads/Cellar').filter(n => n.startsWith('Large files'));
+    ok(dirs.length === 1 && fs.existsSync(process.env.HOME + '/Downloads/Cellar/' + dirs[0] + '/report.pdf'), 'file saved to the Mac first');
+    ok(fs.readdirSync(R + '/.CellarTrash').some(n => n.endsWith('__report.pdf')), 'then moved to the phone Trash');
+  });
+  await step('dupes', async () => {
+    const D = R + '/Documents'; fs.writeFileSync(D + '/dupA.bin', 'A'.repeat(5000)); fs.writeFileSync(D + '/dupB.bin', 'A'.repeat(5000)); fs.utimesSync(D + '/dupA.bin', 1700000000, 1700000000);
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=dupes]');
+    await p.click('#library button[data-lib=dupes]'); await p.waitForSelector('#dpTot', {timeout:30000});
+    const g = p.locator('fieldset.group', {hasText: 'dupA.bin'});
+    ok(await g.locator('label.dupe').count() === 2 && await g.locator('input:checked').count() === 1, 'duplicate group lists both copies, one kept');
+    ok((await g.locator('label.dupe').first().textContent()).includes('Keep'), 'the oldest copy is kept by default');
+    await p.screenshot({path:__dirname + '/shots/dupes.png', fullPage:true});
+    await g.locator('label.dupe').nth(1).locator('input').check();
+    ok((await g.locator('label.dupe').nth(0).textContent()).includes('Move to Trash'), 'choosing the other copy flips the plan');
+    await g.locator('label.dupe').nth(0).locator('input').check();
+    await p.click('#dpGo'); await p.waitForSelector('#confirm[open]'); await p.click('#cnOk'); await p.waitForSelector('.toast:has-text("Trash")', {timeout:20000});
+    ok(fs.existsSync(D + '/dupA.bin') && !fs.existsSync(D + '/dupB.bin'), 'only the extra copy moved to the Trash');
+    ok(fs.readdirSync(R + '/.CellarTrash').some(n => n.endsWith('__dupB.bin')), 'duplicate is in the Cellar Trash');
+    fs.unlinkSync(D + '/dupA.bin');
+  });
+  await step('export', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=export]');
+    await p.click('#library button[data-lib=export]'); await p.waitForSelector('#exGo');
+    ok(await p.locator('[data-ex]:checked').count() === 3, 'export page offers contacts, calls and calendar');
+    await p.click('#exGo'); await p.waitForSelector('.exlist li', {timeout:20000});
+    ok(await p.locator('.exlist li').count() === 3 && (await p.textContent('.exlist')).includes('3 contacts'), 'export results listed with counts');
+    await p.screenshot({path:__dirname + '/shots/export.png', fullPage:true});
+    ok(fs.readdirSync(process.env.HOME + '/Downloads/Cellar/Exports').length === 1, 'files land in Downloads/Cellar/Exports/<date>');
+  });
+  await step('messages', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=messages]');
+    await p.click('#library button[data-lib=messages]'); await p.waitForSelector('#smGo');
+    ok(await p.locator('[data-smkey]').count() === 2 && (await p.textContent('#smSel')).includes('3 messages'), 'conversations listed with message counts');
+    await p.locator('[data-smkey]').first().uncheck(); ok((await p.textContent('#smSel')).includes('1 conversation'), 'unticking a conversation updates the total');
+    await p.locator('[data-smkey]').first().check(); await p.check('[name=smfmt][value=both]');
+    await p.click('#smGo'); await p.waitForSelector('#smShow', {timeout:30000});
+    const md = process.env.HOME + '/Downloads/Cellar/Exports/' + new Date().toLocaleDateString('en-CA') + '/Messages';
+    ok(fs.existsSync(md + '/messages.csv') && fs.existsSync(md + '/messages.pdf'), 'CSV and PDF saved');
+    await p.screenshot({path:__dirname + '/shots/messages.png', fullPage:true});
+    fs.writeFileSync(__dirname + '/fakebin/sms_denied', '');
+    await p.reload(); await p.click('#library button[data-lib=messages]'); await p.waitForSelector('.state h1');
+    fs.unlinkSync(__dirname + '/fakebin/sms_denied');
+    ok((await p.textContent('.state h1')).includes('won’t share') && !(await p.$('#smGo')), 'refusing phone gets a plain explanation');
+  });
+  await step('camera', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('table, .grid, .state');
+    let posted = null;
+    await p.route('**/api/tools*', r => r.fulfill({json:{adb:'/x/adb', scrcpy:'/x/scrcpy', scrcpy_version:[2,4], mac:true}}));
+    await p.route('**/api/mirror*', r => { posted = JSON.parse(r.request().postData() || '{}'); r.fulfill({json:{running:true}}); });
+    await p.click('#mirrorBtn'); await p.waitForSelector('#mrCamTab');
+    ok(await p.getAttribute('#mrCamTab', 'aria-disabled') === null, 'phone camera is offered on Android 15');
+    await p.click('#mrCamTab'); ok(await p.isVisible('#mrFacing') && !(await p.isVisible('#mrKbd')), 'camera tab swaps the options');
+    ok(!(await p.isChecked('#mrMic')), 'microphone is off by default');
+    await p.selectOption('#mrFacing', 'front'); await p.screenshot({path:__dirname + '/shots/camera.png'});
+    await p.click('#mrStart'); await p.waitForTimeout(300);
+    ok(posted && posted.source === 'camera' && posted.facing === 'front' && posted.mic === false, 'sends camera + facing to the server');
+    await p.evaluate(() => { S.info = Object.assign({}, S.info, {android: '11'}); });
+    await p.click('#mirrorBtn'); await p.waitForSelector('#mrCamTab[aria-disabled=true]', {timeout:5000}).catch(() => {});
+    ok(await p.getAttribute('#mrCamTab', 'aria-disabled') === 'true' && (await p.textContent('#mrCamTab')).includes('Android 12'), 'older Android: camera disabled with the reason shown');
+    await p.unroute('**/api/tools*'); await p.unroute('**/api/mirror*');
+  });
+  await step('extras', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=extras]');
+    await p.click('#library button[data-lib=extras]'); await p.waitForSelector('#xrRingGo');
+    ok(await p.locator('[data-media]').count() === 6 && await p.isEnabled('#xrRingGo'), 'phone controls page shows ring, media keys and DND');
+    await p.click('#xrRingGo'); await p.waitForFunction(() => /Alarm set/.test(document.querySelector('#xrRingMsg').textContent));
+    ok((await p.textContent('#xrRingMsg')).includes('00:00'), 'ring reports when the alarm will sound');
+    await p.check('[name=dnd][value=priority]'); await p.waitForFunction(() => document.querySelector('#xrDndMsg').textContent === 'Done.');
+    ok(fs.readFileSync(__dirname + '/fakebin/zen.state', 'utf8').trim() === '1', 'Do Not Disturb changed on the phone');
+    fs.writeFileSync(__dirname + '/fakebin/dnd_denied', '');
+    await p.check('[name=dnd][value=none]'); await p.waitForFunction(() => /didn.t change/.test(document.querySelector('#xrDndMsg').textContent));
+    fs.unlinkSync(__dirname + '/fakebin/dnd_denied'); await p.waitForTimeout(500);
+    ok(await p.isChecked('[name=dnd][value=priority]'), 'a refused change snaps back to the real setting and says why');
+    await p.screenshot({path:__dirname + '/shots/extras.png', fullPage:true});
+    fs.writeFileSync(__dirname + '/fakebin/zen.state', '0\n');
+  });
+  await step('sync', async () => {
+    const HM = process.env.HOME, MAC = HM + '/SyncUi/Notes', PH = R + '/SyncUi';
+    fs.rmSync(HM + '/SyncUi', {recursive:true, force:true}); fs.rmSync(PH, {recursive:true, force:true});
+    fs.mkdirSync(MAC, {recursive:true}); fs.mkdirSync(PH, {recursive:true}); fs.writeFileSync(MAC + '/mac.txt', 'from mac'); fs.writeFileSync(PH + '/phone.txt', 'from phone');
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=sync]');
+    await p.click('#library button[data-lib=sync]'); await p.waitForSelector('#syAdd');
+    ok(await p.isHidden('#newFolderBtn') && await p.isHidden('#addBtn'), 'page views hide the file-only toolbar buttons');
+    await p.click('#syAdd'); ok((await p.inputValue('#syPhone')) === '' && await p.isHidden('#syAdd'), 'sync form starts with an empty phone folder and replaces the Add button');
+    await p.fill('#syMac', MAC); await p.fill('#syPhone', PH);
+    await p.click('#syPhonePick'); await p.waitForSelector('.browse [data-bpick]');
+    ok(await p.isDisabled('.browse [data-bpick]'), 'the whole storage can’t be picked');
+    await p.click('.browse [data-bgo$="/Documents"]'); await p.waitForSelector('.browse [data-bpick]:not([disabled])'); await p.click('.browse [data-bpick]');
+    ok((await p.inputValue('#syPhone')).endsWith('/Documents'), 'phone folder browser fills the field');
+    await p.fill('#syPhone', PH); await p.click('#syCreate'); await p.waitForSelector('#syGo');
+    ok((await p.textContent('#syPv')).includes('First sync') && (await p.textContent('.pvlist')).includes('Copy to the phone') && (await p.textContent('.pvlist')).includes('Copy to your Mac'), 'first sync shows a preview before anything is copied');
+    ok(!fs.existsSync(MAC + '/phone.txt') && !fs.existsSync(PH + '/mac.txt'), 'nothing copied while previewing');
+    await p.screenshot({path:__dirname + '/shots/sync.png', fullPage:true});
+    await p.click('#syGo'); await p.waitForSelector('.toast:has-text("in sync")', {timeout:30000});
+    ok(fs.readFileSync(MAC + '/phone.txt', 'utf8') === 'from phone' && fs.readFileSync(PH + '/mac.txt', 'utf8') === 'from mac', 'sync copied both ways');
+    await p.waitForSelector('[data-syauto]:not([disabled])'); await p.check('[data-syauto]');
+    ok((await p.textContent('[data-pair] .note')).includes('Last sync'), 'pair shows when it last synced');
+    await p.click('[data-syremove]'); await p.click('#cnOk'); await p.waitForSelector('.state h1');
+    ok(fs.existsSync(MAC + '/phone.txt') && fs.existsSync(PH + '/mac.txt'), 'removing a pair leaves both folders alone');
+    fs.rmSync(HM + '/SyncUi', {recursive:true, force:true}); fs.rmSync(PH, {recursive:true, force:true});
+  });
+  console.log('errors:', errs); await b.close();
+})();

@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "input $*" >> "$(dirname "$0")/calls.log"

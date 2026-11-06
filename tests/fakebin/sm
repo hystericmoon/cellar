@@ -1,0 +1,8 @@
+#!/bin/sh
+# Pretends to be Android's `sm`: every /storage/XXXX-XXXX folder is a mounted SD card.
+case "$1 $2" in
+  "list-volumes public"|"list-volumes ")
+    for d in /storage/*-*; do [ -d "$d" ] && echo "public:179,65 mounted $(basename "$d")"; done;;
+  "list-volumes all") echo "emulated;0 mounted null";;
+esac
+exit 0

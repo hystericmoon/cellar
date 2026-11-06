@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+import sys, os, subprocess, json
+D = os.path.dirname(os.path.abspath(__file__)); ST = D + "/state.json"
+st = json.load(open(ST)) if os.path.exists(ST) else {"devs": [["FAKE123", "usb"]], "mdns": []}
+save = lambda: json.dump(st, open(ST, "w"))
+a = sys.argv[1:]; serial = None
+if a[:1] == ["-s"]: serial, a = a[1], a[2:]
+cmd = a[0] if a else ""
+if cmd == "start-server": pass
+elif cmd == "devices":
+    print("List of devices attached")
+    for s, t in st["devs"]:
+        print(f"{s}\tdevice " + ("usb:1-1 " if t == "usb" else "") + "product:x model:Pixel_8_Pro device:x")
+elif cmd in ("shell", "exec-out"):
+    c = " ".join(a[1:])
+    rep = {"getprop ro.serialno": "echo HW-PIXEL8", "getprop ro.product.manufacturer": "echo google",
+           "getprop ro.product.model": "echo Pixel 8 Pro", "getprop ro.build.version.release": "echo 15",
+           "screencap -p": "cat /tmp/shot.png",
+           "ip -o -f inet addr show": "printf '1: lo    inet 127.0.0.1/8 scope host lo\\n30: wlan0    inet 192.168.1.42/24 brd 192.168.1.255\\n'"}
+    for k, v in rep.items(): c = c.replace(k, v)
+    os.environ["PATH"] = D + ":" + os.environ["PATH"]
+    sys.stdout.flush(); os.execvp("sh", ["sh", "-c", c])
+elif cmd == "tcpip": print("restarting in TCP mode port: 5555")
+elif cmd == "connect":
+    addr = a[1]
+    if addr.startswith("192.168.1.42:"):
+        if not any(s == addr for s, _ in st["devs"]): st["devs"].append([addr, "wifi"]); save()
+        print("connected to " + addr)
+    else: print(f"failed to connect to '{addr}': Connection refused")
+elif cmd == "disconnect":
+    st["devs"] = [d for d in st["devs"] if d[0] != a[1]]; save(); print("disconnected " + a[1])
+elif cmd == "mdns":
+    print("List of discovered mdns services")
+    for m in st["mdns"]: print("\t".join(m))
+elif cmd == "pair":
+    if a[2] in ("123456",) or a[2] == st.get("qrpw"):
+        st["mdns"].append(["adb-HW-PIXEL8-xyz", "_adb-tls-connect._tcp", "192.168.1.42:40111"]); save()
+        print("Successfully paired to " + a[1] + " [guid=adb-HW]")
+    else: print("Failed: Wrong password or connection was dropped.")
+elif cmd == "pull":
+    src, dst = (a[2], a[3]) if a[1] == "-a" else (a[1], a[2]); r = subprocess.run(["cp", "-rp", src, dst]); sys.exit(r.returncode)
+elif cmd == "push":
+    r = subprocess.run(["cp", "-r", a[1], a[2]]); sys.exit(r.returncode)
+elif cmd == "install":
+    print("Performing Streamed Install"); print("Success")
+elif cmd == "uninstall":
+    print("Success")

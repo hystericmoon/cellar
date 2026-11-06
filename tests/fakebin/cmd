@@ -1,0 +1,13 @@
+#!/bin/sh
+# fake `cmd notification set_dnd`, `cmd media_session volume`, `cmd package resolve-activity`
+D="$(dirname "$0")"
+echo "cmd $*" >> "$D/calls.log"
+case "$1 $2" in
+  "notification set_dnd")
+    [ -f "$D/dnd_denied" ] && { echo "Exception occurred while executing 'set_dnd': java.lang.SecurityException: Notification policy access denied"; exit 1; }
+    case "$3" in off|all) echo 0 > "$D/zen.state";; priority|on) echo 1 > "$D/zen.state";; none) echo 2 > "$D/zen.state";; alarms) echo 3 > "$D/zen.state";; esac;;
+  "media_session volume") ;;
+  "package resolve-activity")
+    [ -f "$D/no_clock" ] && echo "No activity found" || { echo "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true"; echo "com.google.android.deskclock/com.android.deskclock.alarm.handler.CreateAlarmActivity"; };;
+esac
+exit 0

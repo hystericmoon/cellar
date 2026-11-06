@@ -1,0 +1,10 @@
+cellar.zip
+__pycache__/
+tests/shots/
+tests/*.out
+tests/server.log
+tests/fakebin/state.json
+tests/fakebin/calls.log
+tests/fakebin/zen.state
+tests/fakebin/*_denied
+tests/fakebin/no_clock

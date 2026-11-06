@@ -1,0 +1,4 @@
+#!/bin/sh
+# `date +%H:%M` on the fake phone is always 23:59, so the minute rollover is covered
+[ "$1" = "+%H:%M" ] && { echo 23:59; exit 0; }
+exec /bin/date "$@"
