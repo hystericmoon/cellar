@@ -29,6 +29,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        if let button = statusItem.button {
+            // Files dropped on the menu bar icon go to the phone's Download folder.
+            let drop = MenuDropView(frame: button.bounds)
+            drop.autoresizingMask = [.width, .height]
+            drop.button = button
+            drop.onDrop = { [weak self] urls in self?.sendDropped(urls) }
+            button.addSubview(drop)
+        }
         requestLocalNetwork()
         startServer()
         pollTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in self?.poll() }
@@ -321,6 +329,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
     @objc private func dndOn() { phoneControl("api/dnd", body: ["mode": "priority"], done: "Do Not Disturb is on", failTitle: "Couldn't change Do Not Disturb") }
     @objc private func dndOff() { phoneControl("api/dnd", body: ["mode": "off"], done: "Do Not Disturb is off", failTitle: "Couldn't change Do Not Disturb") }
 
+    private func sendDropped(_ urls: [URL]) {
+        guard connected, !urls.isEmpty else { notify("No phone connected", "Connect your phone, then drop the files again."); return }
+        request("api/dropfiles", method: "POST", body: ["paths": urls.map { $0.path }]) { [weak self] obj in
+            if let d = obj as? [String: Any], d["id"] != nil {
+                self?.notify("Sending to your phone", "\(urls.count) item\(urls.count == 1 ? "" : "s") to the Download folder. Progress is in Cellar › Transfers.")
+            } else {
+                let msg = ((obj as? [String: Any])?["error"] as? String) ?? "Cellar could not send those files."
+                self?.notify("Could not send", msg)
+            }
+        }
+    }
+
+    private func notify(_ title: String, _ text: String) {
+        let esc: (String) -> String = { $0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+        NSAppleScript(source: "display notification \"\(esc(text))\" with title \"\(esc(title))\"")?.executeAndReturnError(nil)
+    }
+
     @objc private func takeScreenshot() {
         showWindow()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.webView?.evaluateJavaScript("document.getElementById('shotBtn').click()") }
@@ -499,6 +524,27 @@ buildMainMenu()
 app.run()
 
 /// Holds a full-size background view (the window's glass) with the page and the drag strip on top of it.
+/// Transparent layer over the menu bar icon. It accepts dropped files and passes clicks on to the icon.
+final class MenuDropView: NSView {
+    var onDrop: (([URL]) -> Void)?
+    weak var button: NSStatusBarButton?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        registerForDraggedTypes([.fileURL])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseDown(with event: NSEvent) { button?.performClick(nil) }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        guard !urls.isEmpty else { return false }
+        onDrop?(urls)
+        return true
+    }
+}
+
 final class GlassHost: NSView {
     init(background: NSView) {
         super.init(frame: .zero)

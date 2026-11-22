@@ -1629,6 +1629,38 @@ def extras_info(serial):
     return {"dnd": dnd_state(serial), "can_ring": can_ring, "media_keys": list(MEDIA_KEYS)}
 
 
+def drop_files(serial, paths):
+    """Files dropped on the menu bar icon: copy them (a fast APFS clone where possible) into a staging folder
+    and queue one push job to the phone's Download folder."""
+    names, stage = [], secrets.token_hex(8)
+    folder = os.path.join(STAGE_ROOT, stage)
+    os.makedirs(folder, exist_ok=True)
+    for p in paths:
+        p = os.path.abspath(str(p))
+        if not os.path.exists(p):
+            continue
+        name = clean_name(os.path.basename(p.rstrip("/")) or "file")
+        dest, n = os.path.join(folder, name), 2
+        base, ext = os.path.splitext(name)
+        while os.path.exists(dest):
+            name = f"{base} ({n}){ext}"
+            dest, n = os.path.join(folder, name), n + 1
+        if IS_MAC and subprocess.run(["/bin/cp", "-cR", p, dest], capture_output=True).returncode == 0:
+            pass
+        elif os.path.isdir(p):
+            shutil.copytree(p, dest)
+        else:
+            shutil.copy2(p, dest)
+        names.append(name)
+    if not names:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise AdbError("Nothing to send. Those files could not be read.")
+    n = len(names)
+    title = f"Copy {n} items to phone" if n > 1 else f"Copy “{names[0]}” to phone"
+    return public_job(new_job("push", serial, title, {"stage": stage, "dir": HOME_DIR + "/Download",
+                                                      "roots": [{"name": x, "as": x, "policy": "new"} for x in names]}))
+
+
 def take_photo(serial):
     """Open the phone's camera app, press the shutter, and give back the new picture's path on the phone."""
     if "isKeyguardShowing=true" in sh(serial, "dumpsys window | grep -E 'isKeyguardShowing' | head -1"):
@@ -3419,6 +3451,9 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(extras_info(s))
         elif R == ("POST", "/api/media"):
             self.send_json(media_key(s, self.body_json().get("key")))
+        elif R == ("POST", "/api/dropfiles"):
+            d = self.body_json()
+            self.send_json(drop_files(s, d.get("paths") if isinstance(d.get("paths"), list) else []))
         elif R == ("POST", "/api/photo"):
             self.body_json()
             self.send_json(take_photo(s))

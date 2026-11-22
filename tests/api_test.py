@@ -267,5 +267,10 @@ c,_=dav("DELETE",V+"/SD%20card/Documents/from-finder.txt"); ok(c==204 and not os
 c,_=dav("DELETE",V+"/SD%20card"); ok(c==403 and os.path.isdir(SD), "the card itself can't be deleted from Finder")
 c,_=dav("MOVE",V+"/Documents/hi.txt",headers={"Destination":B+V+"/SD%20card/Documents/hi.txt"}); ok(c in (201,204) and os.path.exists(SD+"/Documents/hi.txt") and not os.path.exists(H+"/Documents/hi.txt"), f"move from internal storage to the card ({c})")
 shutil.move(SD+"/Documents/hi.txt",H+"/Documents/hi.txt"); call("/api/trash/empty","POST",{})
+# --- files dropped on the menu bar icon go to the phone's Download folder
+import tempfile; dtmp=tempfile.mkdtemp(); open(dtmp+"/dropped.txt","w").write("dropped"); j=wait(call("/api/dropfiles","POST",{"paths":[dtmp+"/dropped.txt",dtmp+"/missing.txt"]}))
+ok(j["state"]=="done" and open(H+"/Download/dropped.txt").read()=="dropped", "file dropped on the menu bar icon reaches the phone's Download folder")
+r=call("/api/dropfiles","POST",{"paths":[dtmp+"/missing.txt"]}); ok(r.get("HTTP")==502, "drop of unreadable files refused")
+os.remove(H+"/Download/dropped.txt"); shutil.rmtree(dtmp)
 # --- Geist ships with the app and is inlined, so the look works offline
 page=urllib.request.urlopen(B+"/").read().decode(); ok("@font-face{font-family:Geist;src:url(data:font/woff2;base64," in page and "__GEIST__" not in page, "Geist font is bundled into the page")
