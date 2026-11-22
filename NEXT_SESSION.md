@@ -74,7 +74,7 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 ## Done 2026-11-22 (third session, not released yet)
 - Menu bar drop works; debug logging removed.
 - **Compress / Extract here** (`run_archive` in `cellar.py`, job kind `archive`, `archiveOp` in `ui.html`): pull, zip or unzip on the Mac with Python `zipfile`, push back. Refuses password zips and paths that climb out. Checked live on the A55 and in the browser pane.
-- **Two panes** (`P2` code in `ui.html`, toolbar `#splitBtn`, ⌘\\): a second phone folder. Drag between panes, ⌥ copies, Copy/Move buttons, right-click menu. Open state kept in localStorage `dv-split`. Checked live: copy, drag move, zip.
+- **Two panes** (`P2` code in `ui.html`, toolbar `#splitBtn`, ⌘\): a second phone folder. Drag between panes, ⌥ copies, Copy/Move buttons, right-click menu. Open state kept in localStorage `dv-split`. Checked live: copy, drag move, zip.
 - Tests added to `tests/api_test.py` (zip/unzip) and `tests/e2e.js` (menu, two panes). **Not run** (they only run in CI); watch the next CI run.
 - Gaps found by comparing with rivals, still to do: no-USB-debugging mode (MTP), away-from-Wi-Fi transfer, music playlists, Windows support, restore for contacts/messages, messages and notifications on the Mac. Second pane is phone-only (no Mac folder pane).
 
