@@ -78,11 +78,11 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - Tests added to `tests/api_test.py` (zip/unzip) and `tests/e2e.js` (menu, two panes). **Not run** (they only run in CI); watch the next CI run.
 - Gaps found by comparing with rivals, still to do: no-USB-debugging mode (MTP), away-from-Wi-Fi transfer, music playlists, Windows support, restore for contacts/messages, messages and notifications on the Mac. Second pane is phone-only (no Mac folder pane).
 
-## No-USB-debugging mode: test results (2026-11-22, not built)
-- Test phone: Samsung A55 on USB in File transfer mode, USB debugging off, with `libmtp` 1.1.23 from Homebrew (user OK'd; remove with `brew uninstall libmtp` if dropped).
-- `ptpcamerad` (Mac's Image Capture helper) grabs the phone first: libusb claim fails with -3 (access). `pkill` (SIGTERM) does nothing; `kill -9` works, but launchd restarts it at once, so a session needs a fast kill right before opening, or a kill loop. Killing it is the user's call (said yes for the test). Do not disable it with launchctl.
-- After the kill, `mtp-detect` worked. But `mtp-folders` and `mtp-files` did not finish in 120 s: libmtp's full-tree listing is too slow on this phone. A usable client must list one folder at a time (aft-mtp-cli or a custom libmtp/libusb client).
-- Design from the advisor: route by device id `mtp:<serial>`; basic mode only (browse, save to Mac, add files, new folder, rename, delete with "deleted for good" confirm); hide all shell features and show a banner on how to turn on USB debugging; match MTP to adb by serial so a phone never shows twice; one long-lived MTP session behind a lock; bundle the binary + LGPL text; fake MTP tool in `tests/fakebin` for CI.
+## No-USB-debugging mode: tried and dropped (2026-11-22)
+- Tested on the Samsung A55 (USB, File transfer mode, USB debugging off) with `libmtp` 1.1.23 and `aft-mtp-cli` 4.6 from Homebrew. Both tools are uninstalled again.
+- `ptpcamerad` (Mac Image Capture helper) grabs the phone first: libusb claim fails with -3. `kill -9` lets one `mtp-detect` through, but launchd restarts it at once. Afterwards the phone never opened an MTP session ("failed to open session"), even after a replug with the phone unlocked, a kill loop, and a second tool. `mtp-folders`/`mtp-files` and `aft-mtp-cli ls` hung for 1-2 minutes with no output. Not tried: also stopping `icdd`.
+- Decision: not worth it. It would need stopping Mac helpers on every connect and is fragile. Gaps with better value: restore for contacts and messages, messages and notifications on the Mac.
+- If someone retries: route by device id `mtp:<serial>`, basic mode only (browse, save to Mac, add files, new folder, rename, delete with "deleted for good" confirm), hide shell features, match MTP to adb by serial, one long-lived MTP session behind a lock, bundle the binary with the LGPL text, fake MTP tool in `tests/fakebin`.
 
 ## Proposed, waiting for the user
 - **Mirror inside the app.** (The user chose to skip it for now.) A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
