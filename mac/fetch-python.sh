@@ -17,7 +17,7 @@ BASE="https://github.com/astral-sh/python-build-standalone/releases/download/$TA
 CACHE="$HOME/Library/Caches/Cellar/python/$TAG"
 mkdir -p "$CACHE"
 if [ ! -f "$CACHE/$FILE" ]; then
-  echo "Downloading $FILE…"
+  echo "Downloading ${FILE}..."
   curl -fL --progress-bar -o "$CACHE/$FILE.part" "$BASE/$FILE"
   mv "$CACHE/$FILE.part" "$CACHE/$FILE"
 fi
