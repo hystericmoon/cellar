@@ -1651,6 +1651,10 @@ def clipboard_sync(serial, on):
             raise AdbError("Clipboard sharing could not start. Check that the phone is unlocked and USB debugging is on.")
     elif not on and clipboard_running(serial):
         CLIPBOARDS[serial].terminate()
+        try:
+            CLIPBOARDS[serial].wait(3)
+        except subprocess.TimeoutExpired:
+            CLIPBOARDS[serial].kill()
     return {"clipboard": clipboard_running(serial)}
 
 
