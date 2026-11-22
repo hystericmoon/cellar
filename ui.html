@@ -1993,9 +1993,14 @@ async function renderExtras(token) {
       <div class="dndopts" role="radiogroup" aria-labelledby="xrDnd">${DND_OPTS.map(([k, label, sub]) => `<label class="toggle"><input type="radio" name="dnd" value="${k}" ${x.dnd === k ? "checked" : ""}><span><b>${label}</b><small>${sub}</small></span></label>`).join("")}</div>
       <p class="note" id="xrDndMsg" aria-live="polite"></p></section>
     <section class="panel" aria-labelledby="xrScreen"><h2 id="xrScreen">Screen and camera</h2><div class="spbar">
-      <button class="btn" type="button" data-xr="mirror">Mirror screen</button><button class="btn" type="button" data-xr="shot">Take a screenshot</button><button class="btn" type="button" data-xr="camera">Phone camera</button></div></section>
+      <button class="btn" type="button" data-xr="mirror">Mirror screen</button><button class="btn" type="button" data-xr="shot">Take a screenshot</button><button class="btn" type="button" data-xr="photo">Take a photo</button><button class="btn" type="button" data-xr="camera">Phone camera</button></div></section>
     </div></div></div>`;
-  document.querySelectorAll("[data-xr]").forEach(b => b.onclick = () => { if (b.dataset.xr === "shot") return $("#shotBtn").click();
+  document.querySelectorAll("[data-xr]").forEach(b => b.onclick = async () => { if (b.dataset.xr === "shot") return $("#shotBtn").click();
+    if (b.dataset.xr === "photo") { const t = toast("Taking a photo with the phone…"); b.disabled = true;
+      try { const r = await postJSON("/api/photo", {}); t.remove(); toast("Photo saved to Downloads/Cellar/Photos");
+        lastFocus = document.activeElement; current = { blob: fileUrl(r.path), fname: r.name }; $("#vTitle").innerHTML = `Photo<small>${esc(r.name)}</small>`;
+        $("#vPrev").disabled = $("#vNext").disabled = true; $("#vBody").innerHTML = `<img src="${esc(fileUrl(r.path))}" alt="The photo just taken">`; V.showModal(); }
+      catch(e) { t.remove(); toast(e.message, {err:true}); } b.disabled = false; return; }
     $("#mirrorBtn").click(); if (b.dataset.xr === "camera") setTimeout(() => { const c = $("#mrCamTab"); if (c) c.click(); }, 400); });
   $("#xrRingGo").onclick = async () => { const b = $("#xrRingGo"), m = $("#xrRingMsg"); b.disabled = true;
     try { const r = await postJSON("/api/ring", {}); m.textContent = `Alarm set for ${r.at}. If nothing rings within a minute or two, this phone doesn’t support it.`; }

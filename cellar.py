@@ -1629,6 +1629,32 @@ def extras_info(serial):
     return {"dnd": dnd_state(serial), "can_ring": can_ring, "media_keys": list(MEDIA_KEYS)}
 
 
+def take_photo(serial):
+    """Open the phone's camera app, press the shutter, and give back the new picture's path on the phone."""
+    if "isKeyguardShowing=true" in sh(serial, "dumpsys window | grep -E 'isKeyguardShowing' | head -1"):
+        raise AdbError("The phone is locked. Unlock it, then try again.")
+    folder = "/sdcard/DCIM/Camera"
+
+    def newest():
+        out = sh(serial, f"ls -t {folder} 2>/dev/null | grep -v '^\\.' | head -1").strip()
+        return out
+    before = newest()
+    sh(serial, "am start -a android.media.action.STILL_IMAGE_CAMERA")
+    time.sleep(2.5)
+    sh(serial, "input keyevent KEYCODE_CAMERA")
+    for _ in range(24):
+        time.sleep(0.5)
+        now = newest()
+        if now and now != before and now.lower().endswith((".jpg", ".jpeg", ".heic", ".png")):
+            time.sleep(0.8)      # let the phone finish writing the file
+            break
+    else:
+        raise AdbError("The phone didn't take a photo. Open its Camera app once, allow everything it asks, and try again.")
+    sh(serial, "input keyevent KEYCODE_HOME")
+    path = f"{folder}/{now}"
+    return {"path": path, "name": now, "saved": pull_to_mac(serial, path, "Photos")}
+
+
 def media_key(serial, key):
     if key not in MEDIA_KEYS:
         raise AdbError("Unknown key")
@@ -3393,6 +3419,9 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(extras_info(s))
         elif R == ("POST", "/api/media"):
             self.send_json(media_key(s, self.body_json().get("key")))
+        elif R == ("POST", "/api/photo"):
+            self.body_json()
+            self.send_json(take_photo(s))
         elif R == ("POST", "/api/dnd"):
             self.send_json(set_dnd(s, self.body_json().get("mode")))
         elif R == ("POST", "/api/ring"):
