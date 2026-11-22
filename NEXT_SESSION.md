@@ -1,12 +1,12 @@
 # Cellar: next session
 
-Updated 2026-11-22. Work happens on `main` (latest pushed: `22c6668` fixed sidebar/toolbar, battery refresh, type filter, upright camera). Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
+Updated 2026-11-22 (second session). Work happens on `main`; tag `v0.2.1` is pushed (release workflow builds the DMG). Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
 
 ## State
 - **Released:** Cellar **0.2.0** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.0: `Cellar.dmg` (universal, ad-hoc signed, not notarized) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window). v0.1.0 (arm64 zip) is older.
 - **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically.
 - **CI:** tests green on main (API 136, Browser 81 for `22c6668`). The release workflow is green for v0.2.0.
-- **Installed app:** `/Applications/Cellar.app` is a local build of `22c6668` (built 2026-11-22 with `NO_INSTALL=1 mac/build-app.sh`, old copy in the Mac Trash). Not released yet: the next tag (v0.2.1) would ship it.
+- **Installed app:** `/Applications/Cellar.app` is a local build of v0.2.1 with the bundled Python (`BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, arm64 only; old copy in the Mac Trash). Verified: the server runs from `Resources/python-arm64`.
 - **To release:** `git tag -a v0.2.1 -m ... && git push origin v0.2.1`. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`).
 - Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 
@@ -50,7 +50,18 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - DMG: `mac/make-dmg.sh <version>` builds a universal app and a branded DMG with dmgbuild (create-dmg's Finder scripting didn't save the layout on macOS 26). `.github/workflows/release.yml` does it on a `v*` tag and uploads `Cellar.dmg`. Unsigned: first open needs Open Anyway. Tested 0.2.0 from a Safari-flagged copy: opened fine after Open Anyway.
 - A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
 
-## Done 2026-11-22
+## Done 2026-11-22, second session (shipped as v0.2.1)
+- **Camera stays upright** (`cellar.py`: `tilt_from_gravity`, `read_tilt`, `_watch_tilt`). scrcpy cannot rotate a running camera, so Cellar reads the phone's accelerometer from `dumpsys sensorservice` (newest samples) and restarts scrcpy with a new `--orientation` when the phone turns (read twice in a row). Back camera: `90 - tilt`; front camera: `270 + tilt` (Android's own rule). The window reopens around the same centre and is brought to the front with System Events (`NSRunningApplication.activate` does nothing from a background process on macOS 14+). When the phone's screen is off the sensor sleeps and the newest sample stops changing: Cellar then sends `KEYCODE_WAKEUP`. Checked live: back and front, all turns.
+- **Take a photo** (`take_photo`, `POST /api/photo`, button in Phone controls): opens the Camera app, presses `KEYCODE_CAMERA`, pulls the new file to `~/Downloads/Cellar/Photos`. Needs an unlocked phone (it says so). Checked live on the A55.
+- **Video thumbnails** (`video_thumb`): copies the video (<400 MB) once, Quick Look (`qlmanage -t`) draws a frame, cached like photos. Grid shows a play badge. Not made on non-Mac or for bigger files (icon stays).
+- **Drop files on the menu bar icon** (`MenuDropView` in `Cellar.swift`, `POST /api/dropfiles`): APFS clone into staging, one push job into the phone's Download folder, a notification. Server side checked live; the Swift drag itself was only compile-checked, so try it.
+- **Shared clipboard** (`clipboard_sync`, toggle in Phone controls): scrcpy `--no-video --no-audio --no-window` keeps both clipboards equal. Checked live both ways. It stops when Cellar quits.
+- **Bundled Python:** `mac/fetch-python.sh` downloads python-build-standalone (release 20261110, checksum checked, cached in `~/Library/Caches/Cellar/python`); `build-app.sh` puts it in `Resources/python-<arch>` when `UNIVERSAL=1` or `BUNDLE_PYTHON=1`; `Cellar.swift` prefers it. The DMG grows by about 50 MB. The universal DMG from CI is untested on a clean Mac.
+- MIT `LICENSE` added (holder "hystericmoon").
+- One CI run of `tests` failed 3 browser checks on the Free up space page (biggest file first, saved, trashed); the re-run of the same commit passed. Treat it as a flaky test, but watch it.
+- A test photo (`DCIM/Camera/20261122_105905.jpg`) is on the phone and in `~/Downloads/Cellar/Photos`.
+
+## Done 2026-11-22 (first session)
 - **Only the file list scrolls:** `.app` has `grid-template-rows:minmax(0,1fr)`, `aside,main{min-height:0}`, `html,body{overflow:hidden}`, and `.sr` has `top:0;left:0` (the hidden `#announce` pushed the page 1px). Checked on Home, Settings, Free up space, Apps, Backup, Recent, Trash, Camera, and in `/?app=1`.
 - **Battery:** the page read `/api/info` only when a phone connected. `refreshInfo()` now runs every 30 s (skipped while hidden) and on `visibilitychange`; it redraws only when battery or free space changed, keeps focus, and updates `#hmSub` on Home. The menu bar app already polled every 4 s.
 - **Type filter:** funnel button `#kindBtn` next to Search opens a menu (All kinds, Folders, Images, Videos, Audio, Documents = text+pdf, Archives, Apps, Other) with counts; empty kinds are disabled. `S.kind` filters `visible()`, so select all takes only what's shown; hidden selected items are dropped. It clears when you open another folder or view. Empty state offers "Show all kinds".
@@ -61,12 +72,12 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
   (the watcher would run on-connect actions such as auto backup and Finder mount). Don't change settings there: it shares `~/.cellar.json`.
 
 ## Proposed, waiting for the user
-- **Mirror inside the app.** A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
-- **Feature ideas given:** video thumbnails (videos show only an icon), bundle Python, shared clipboard, drop files on the menu bar icon, add a LICENSE.
+- **Mirror inside the app.** (The user chose to skip it for now.) A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
+- **Feature ideas not built yet:** none open. The user was offered the list on 2026-11-22 and everything except in-app mirroring was built.
 
 ## Still open
 1. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
-2. **Clean-Mac install** of the DMG: skipped by the user for now. Known gap: a Mac without Command Line Tools gets asked to install them on first launch (the app runs /usr/bin/python3). Bundling a standalone Python (~40 MB) would remove this.
+2. **Clean-Mac install** of the DMG: skipped by the user for now. Python is bundled now, so no Command Line Tools prompt is expected; untested on a clean Mac.
 3. **Not verified:** Open Anyway with the CI-built DMG itself (the local build was tested; same sources). The menu bar door icon wasn't visible in a screenshot (a menu bar organiser may hide it); the user hasn't confirmed it.
 4. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway; `make-dmg.sh` notes where signing goes.
 5. On the phone: Revoke USB debugging authorizations was used during the pairing test, so the next USB plug-in asks to allow the Mac again.
