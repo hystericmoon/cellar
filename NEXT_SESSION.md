@@ -1,6 +1,6 @@
 # Cellar: next session
 
-Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the v0.2.1 tag failed to build; leave it). Everything is pushed. The untracked `linkedin/` folder (a LinkedIn image) stays out of commits.
+Updated 2026-11-22 (fourth session). Work happens on `main`. Release **v0.2.3** is published (the v0.2.1 tag failed to build; leave it). Everything is pushed. The untracked `linkedin/` folder (a LinkedIn image) stays out of commits.
 
 ## State
 - **Release:** https://github.com/hystericmoon/cellar/releases/tag/v0.2.3. `Cellar.dmg` (universal, bundled Python, ad-hoc signed, not notarized, 36 MB) plus `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway.
@@ -20,6 +20,12 @@ Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the
 - Checked live on the A55 (Android 17): title and text come through, and a test notification (`cmd notification post`) showed up as new within 12 s. Not checked live: a real Mac alert popup, a chat-app (WhatsApp) message, Open on phone.
 - Text messages are NOT covered: Google Messages is the default app and keeps newer chats (RCS) outside `content://sms` (newest row there is 3 Nov). Reply is not built: adb cannot send a text reliably; Open on phone is the fallback. Possible next step: `am start -a android.intent.action.SENDTO -d smsto:NUMBER --es sms_body TEXT` opens a pre-filled draft.
 - Tests added (`tests/fakebin/dumpsys`, `monkey`; API and browser). Not run locally; watch CI.
+
+## Tomorrow: first steps
+1. The user rebuilt and installed the app with phone notifications (2026-11-22 evening, `/Applications/Cellar.app`, from commit `4f057bc`). Ask how it went: Notifications page, the Settings toggle, a real Mac alert popup, Local Network permission prompt.
+2. Check CI is still green on main. Watch the flaky `space` step (see Still open).
+3. If notifications work: release v0.3.0 (update `.github/release-notes.md` first, then tag). Open items for it: add a notifications card to the site, and decide on a text-draft button (`am start ... smsto:`).
+4. Then pick the next feature from the list below.
 
 ## Next work (the user said: another time)
 1. Restore for contacts and messages (export exists, import does not).
