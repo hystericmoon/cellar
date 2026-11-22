@@ -2361,6 +2361,11 @@ def build_mirror_cmd(exe, serial, opts, info, version):
             raise AdbError("Your copy of scrcpy is too old for the camera (it needs 2.2 or newer). Update it with “brew upgrade scrcpy”, then try again.")
         facing = opts.get("facing") if opts.get("facing") in ("front", "back", "external") else "back"
         cmd += ["--video-source=camera", f"--camera-facing={facing}", "--no-control", "--window-title", f"{name} camera ({facing})"]
+        # scrcpy sends the camera picture as the sensor sees it, and phone sensors sit sideways (back 90°, front 270°),
+        # so an upright phone showed a picture turned to the left. Turn it upright; ⌥← / ⌥→ in the window turn it further.
+        turn = {"back": 90, "front": 270}.get(facing)
+        if turn:
+            cmd.append(f"--orientation={turn}")
         if opts.get("mic"):
             cmd.append("--audio-source=mic")
         else:

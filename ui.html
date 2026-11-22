@@ -66,11 +66,12 @@ window.APPEARANCE = (function () {
 html.nokind :is(.k-violet,.k-pink,.k-amber,.k-orange,.k-green,.k-lime,.k-teal,.k-sky){--k:var(--muted)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font:14px/1.45 "Geist","Geist Sans",-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:6px}
-.app{display:grid;grid-template-columns:248px 1fr;height:100vh}
+.app{display:grid;grid-template-columns:248px 1fr;grid-template-rows:minmax(0,1fr);height:100vh}
+aside,main{min-height:0}
 aside{background:var(--side);border-right:1px solid var(--line);padding:16px 10px 12px;overflow:auto;display:flex;flex-direction:column;gap:2px;font-size:13px}
 .brand{display:flex;align-items:center;gap:10px;padding:0 8px 14px;font-weight:600;font-size:15px;letter-spacing:-.01em}
 .brand .wordmark{height:22px;width:auto;display:block}.brand .door{fill:var(--brand-door,var(--accent))}.brand .word{fill:var(--text)}
@@ -123,6 +124,8 @@ main{display:flex;flex-direction:column;min-width:0;position:relative}
 @media (max-width:1180px){.btn .lbl{display:none}.btn:has(.lbl){width:32px;padding:0;justify-content:center}}
 @media (max-width:1040px){.search input{width:140px}.crumbs{min-width:96px}.toolbar{gap:6px;padding:12px 14px}}
 .btn svg{width:16px;height:16px}
+.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
+.btn.on .lbl{display:inline!important}.btn.on:has(.lbl){width:auto!important;padding:0 12px!important}
 .btn:disabled{opacity:.45;cursor:default}
 .seg{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
 .seg button{border:0;background:none;width:30px;height:26px;border-radius:7px;display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:background-color .15s,color .15s}
@@ -221,7 +224,7 @@ dialog::backdrop{background:rgba(10,12,16,.6)}
 .dbody pre{margin:0;padding:18px;width:100%;align-self:start;white-space:pre-wrap;word-break:break-word;font:12.5px/1.55 ui-monospace,Menlo,monospace}
 .dbody iframe{width:100%;height:calc(92vh - 58px);border:0;background:#fff}
 .dbody audio{margin:60px}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sr{position:absolute;top:0;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .btn.full{width:100%;justify-content:center}
 .btn.quiet{border-color:transparent;color:var(--muted);height:28px;font-size:12.5px}
 .btn.quiet:hover{color:var(--text)}
@@ -454,6 +457,7 @@ html.in-app.glass main{background:var(--bg)}
       <button class="btn icon" id="upBtn" type="button" aria-label="Up one folder" title="Up one folder (⌘↑)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
       <div class="crumbs" id="crumbs" role="navigation" aria-label="Current folder"></div>
       <label class="search"><span class="sr">Filter this folder</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="filter" type="search" placeholder="Filter  ( / )" autocomplete="off"></label>
+      <button class="btn" id="kindBtn" type="button" aria-label="All kinds: show only one kind of file" aria-haspopup="menu" aria-expanded="false" title="Show only one kind of file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/></svg><span class="lbl" id="kindLbl">All kinds</span></button>
       <div class="seg" role="group" aria-label="View">
         <button type="button" data-view="list" aria-label="List view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
         <button type="button" data-view="grid" aria-label="Grid view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></button>
@@ -685,6 +689,19 @@ async function refreshDevices() {
   } catch(e) { /* server gone */ }
 }
 function pollDevices() { refreshDevices().finally(() => setTimeout(pollDevices, 3000)); }
+// Battery and free space change while the phone stays connected: fetch them again every 30 s while Cellar is on screen.
+const infoSig = i => i ? JSON.stringify([i.battery, i.storage && i.storage.free]) : "";
+async function refreshInfo() {
+  if (!S.serial || !S.ready || document.hidden) return;
+  const serial = S.serial; let info; try { info = await api("/api/info"); } catch(e) { return; }
+  if (serial !== S.serial || infoSig(info) === infoSig(S.info)) return;   // only redraw when a number changed
+  S.info = info;
+  const box = $("#deviceBox"), focusId = box.contains(document.activeElement) ? document.activeElement.id : "";
+  renderDevice(info); if (focusId && $("#" + focusId)) $("#" + focusId).focus();
+  const hs = $("#hmSub"), cur = S.devices.find(d => d.serial === S.serial) || {}; if (hs) hs.textContent = homeSub(info, cur.transport === "wifi");
+}
+setInterval(refreshInfo, 30000);
+document.addEventListener("visibilitychange", refreshInfo);
 async function loadInfo() { resolvePlaces(); try { S.info = await api("/api/info"); } catch(e) { S.info = null; } renderDevice(S.info);
   api("/api/backup").then(b => { S.backupNew = b.count; renderPlaces(); }).catch(() => {}); }   // the "N new" badge on Photo backup
 
@@ -794,6 +811,7 @@ function endLoad(token) { if (S.loadToken === token) { S.loading = false; $("#co
 
 async function go(path, replace, opts = {}) {
   if (!S.serial) return;
+  if (S.mode !== "folder" || S.path !== path) setKind("");
   S.mode = "folder"; S.path = path; S.filter = ""; $("#filter").value = "";
   setHash("#" + encodeURIComponent(path), replace);
   renderCrumbs(); renderPlaces(); renderHint();
@@ -823,6 +841,7 @@ async function showSearch(q, replace) {
 }
 
 async function showView(v, replace) {
+  if (S.mode !== v) setKind("");
   S.mode = v; S.filter = ""; $("#filter").value = "";
   setHash("#:" + v, replace); renderCrumbs(); renderPlaces(); renderHint();
   const token = "v:" + v + Date.now(); beginLoad(token);
@@ -843,6 +862,7 @@ function syncToolbar() {
   $(".seg").hidden = page;
   $("#newFolderBtn").hidden = !listing;
   $("#addBtn").hidden = !listing;
+  $("#kindBtn").hidden = page;
 }
 function renderCrumbs() {
   syncToolbar();
@@ -901,9 +921,28 @@ $("#places").addEventListener("contextmenu", e => { const b = e.target.closest("
   openMenu([{label: "Open", key: "", run: () => go(b.dataset.path)}, "-", {label: "Remove from sidebar", key: "", run: () => PINS.remove(b.dataset.path)}], e.clientX, e.clientY, b); });
 
 /* ---------- list rendering ---------- */
+// Kind filter (toolbar ▸ funnel): one kind at a time. It clears when you open another folder, like the text filter.
+const KINDS = [["", "All kinds"], ["folder", "Folders"], ["image", "Images"], ["video", "Videos"], ["audio", "Audio"],
+  ["doc", "Documents"], ["archive", "Archives"], ["apk", "Apps"], ["file", "Other files"]];
+const kindGroup = e => { const k = kind(e); return k === "text" || k === "pdf" ? "doc" : k; };
+const kindMatch = e => !S.kind || kindGroup(e) === S.kind;
+const kindName = k => (KINDS.find(x => x[0] === k) || KINDS[0])[1];
+function setKind(k) {
+  S.kind = k || "";
+  const b = $("#kindBtn"); b.classList.toggle("on", !!S.kind); $("#kindLbl").textContent = kindName(S.kind);
+  b.setAttribute("aria-label", S.kind ? `${kindName(S.kind)}: showing only this kind. Change` : "All kinds: show only one kind of file");
+  if (S.kind && S.sel && S.sel.size) {   // never keep hidden items selected: ⌘⌫ would trash files you can't see
+    const keep = new Set(S.entries.filter(kindMatch).map(ep)); [...S.sel].forEach(p => { if (!keep.has(p)) S.sel.delete(p); }); syncSel(); }
+}
+$("#kindBtn").onclick = () => { const b = $("#kindBtn"), r = b.getBoundingClientRect(), n = {};
+  (S.entries || []).forEach(e => { const g = kindGroup(e); n[g] = (n[g] || 0) + 1; });
+  b.setAttribute("aria-expanded", "true");
+  openMenu(KINDS.map(([k, label]) => ({label: (S.kind === k ? "✓ " : "") + label, key: String(k ? n[k] || 0 : (S.entries || []).length),
+    disabled: !!k && !n[k] && S.kind !== k, run: () => { setKind(k); render(); }})), r.left, r.bottom + 6, b); };
+$("#content").addEventListener("click", e => { if (e.target.closest("[data-kindall]")) { setKind(""); render(); } });
 function visible() {
   const f = S.mode === "search" ? "" : S.filter.toLowerCase(), k = S.sort.key, d = S.sort.dir;
-  const list = S.entries.filter(e => !f || e.name.toLowerCase().includes(f));
+  const list = S.entries.filter(e => (!f || e.name.toLowerCase().includes(f)) && kindMatch(e));
   if (S.mode === "recent") return list;
   return list.sort((a, b) => {
     if (a.dir !== b.dir) return a.dir ? -1 : 1;
@@ -921,6 +960,7 @@ const dayLabel = t => { const d = new Date(t * 1000), now = new Date(), y = new 
   return d.toLocaleDateString(undefined, {weekday:"long", month:"short", day:"numeric", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric"}); };
 
 function emptyState() {
+  if (S.kind && S.entries.length) return stateHTML("search", `No ${kindName(S.kind).toLowerCase()} here`, `This ${S.mode === "folder" ? "folder" : "list"} has ${S.entries.length} item${S.entries.length > 1 ? "s" : ""}, but none of them are ${kindName(S.kind).toLowerCase()}.`, `<button class="btn" type="button" data-kindall>Show all kinds</button>`);
   if (S.filter && S.mode === "folder") return stateHTML("search", "No matches", `Nothing in this folder matches “${esc(S.filter)}”. Press <kbd>Enter</kbd> to search the whole phone.`);
   if (S.mode === "search") return stateHTML("search", "Nothing found", `No file or folder on the phone has “${esc(S.query)}” in its name.`);
   if (S.mode === "recent") return stateHTML("clock", "Nothing new", "No files on the phone changed in the last 14 days.");
@@ -1103,6 +1143,7 @@ $("#content").addEventListener("contextmenu", e => {
 });
 $("#addBtn").onclick = () => { const r = $("#addBtn").getBoundingClientRect(); $("#addBtn").setAttribute("aria-expanded", "true");
   openMenu([{label: "Files…", key: "", run: () => $("#fileInput").click()}, {label: "Folder…", key: "", run: () => $("#folderInput").click()}], r.right - 220, r.bottom + 6, $("#addBtn")); };
+new MutationObserver(() => { if (MENU.hidden) $("#kindBtn").setAttribute("aria-expanded", "false"); }).observe(MENU, {attributes: true, attributeFilter: ["hidden"]});
 new MutationObserver(() => { if (MENU.hidden) $("#addBtn").setAttribute("aria-expanded", "false"); }).observe(MENU, {attributes: true, attributeFilter: ["hidden"]});
 
 /* ---------- dialogs: confirm + conflicts ---------- */
@@ -2037,13 +2078,14 @@ async function showSyncPreview(id) {
 PAGES.sync = renderSync;
 
 /* ---------- Home: the first screen ---------- */
+const homeSub = (info, wifi) => [wifi ? "Connected over Wi-Fi" : "Connected by cable", info && info.android ? "Android " + info.android : "", info && info.battery != null ? `Battery ${info.battery}%` : ""].filter(Boolean).join(" · ");
 async function renderHome(token) {
   const cam = PLACES.find(p => p[0] === "Camera"), camPath = cam ? HOME + "/" + cam[1] : null;
   const [bk, rec, camLs, sy] = (await Promise.allSettled([api("/api/backup"), api("/api/recent"), camPath ? api("/api/ls", {path: camPath}) : Promise.reject(), api("/api/sync")])).map(x => x.status === "fulfilled" ? x.value : null);
   if (S.loadToken !== token) return;
   const info = S.info, cur = S.devices.find(d => d.serial === S.serial) || {}, wifi = cur.transport === "wifi";
   S.backupNew = bk ? bk.count : 0; renderPlaces();
-  const sub = [wifi ? "Connected over Wi-Fi" : "Connected by cable", info && info.android ? "Android " + info.android : "", info && info.battery != null ? `Battery ${info.battery}%` : ""].filter(Boolean).join(" · ");
+  const sub = homeSub(info, wifi);
   const st = info && info.storage, sp = SPACE.cache[S.serial + "|" + HOME];
   const what = bk && bk.count ? `${bk.photos ? `${bk.photos} photo${bk.photos > 1 ? "s" : ""}` : ""}${bk.photos && bk.videos ? " and " : ""}${bk.videos ? `${bk.videos} video${bk.videos > 1 ? "s" : ""}` : ""}` : "";
   const since = bk && bk.last ? `since your last backup on ${new Date(bk.last * 1000).toLocaleDateString(undefined, {day:"numeric", month:"long"})}` : "not backed up to this Mac yet";
@@ -2060,7 +2102,7 @@ async function renderHome(token) {
   const recent = rec ? rec.entries.slice(0, 6) : [];
   const pairs = sy ? sy.pairs.length : 0;
   $("#content").innerHTML = `<div class="page">
-    <div class="row2" style="align-items:flex-start"><div><h1>${esc(devName(info, cur))}</h1><p class="muted" style="margin:4px 0 0">${esc(sub)}</p></div>
+    <div class="row2" style="align-items:flex-start"><div><h1>${esc(devName(info, cur))}</h1><p class="muted" id="hmSub" style="margin:4px 0 0">${esc(sub)}</p></div>
       <div class="spbar"><button class="btn" type="button" id="hmFinder">Show in Finder</button>${!wifi && !cur.wifi_ready ? `<button class="btn" type="button" id="hmWifi">Go wireless</button>` : ""}</div></div>
     ${bk && bk.count ? `<div class="finding"><p><b>${what}</b> ${since}.</p><button class="btn primary" type="button" id="hmBackup">Back up now</button></div>` : ""}
     <div class="cols3">

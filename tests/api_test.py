@@ -171,7 +171,8 @@ try: cm.build_mirror_cmd("/x/scrcpy","S1",{"source":"camera"},dict(info,android=
 except cm.AdbError as e: ok("Android 12" in str(e) and "Android 11" in str(e), f"Android 11 refused: {e}")
 try: cm.build_mirror_cmd("/x/scrcpy","S1",{"source":"camera"},info,(2,1)); ok(False,"old scrcpy refused")
 except cm.AdbError as e: ok("brew upgrade scrcpy" in str(e), "old scrcpy explains how to update")
-s=cm.build_mirror_cmd("/x/scrcpy","S1",{"screen_off":True,"keyboard":"uhid"},info,(2,4)); ok("--turn-screen-off" in s and "--keyboard=uhid" in s and "--video-source=camera" not in s and "--stay-awake" in s, "screen mirroring command unchanged")
+ok("--orientation=270" in c and "--orientation=90" in cm.build_mirror_cmd("/x/scrcpy","S1",{"source":"camera"},info,(2,4)), "camera picture is turned upright (back 90°, front 270°)")
+s=cm.build_mirror_cmd("/x/scrcpy","S1",{"screen_off":True,"keyboard":"uhid"},info,(2,4)); ok("--turn-screen-off" in s and "--keyboard=uhid" in s and "--video-source=camera" not in s and "--stay-awake" in s and not any(x.startswith("--orientation") for x in s), "screen mirroring command unchanged")
 ok(cm.android_major("15")==15 and cm.android_major("")==0 and cm.android_major("12.1")==12, "android_major")
 # --- step 7: ring, media keys, Do Not Disturb
 LOG=FB+"/calls.log"

@@ -21,6 +21,23 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.keyboard.press('ArrowDown'); await p.keyboard.press('Escape');
     ok(await p.$eval('#ctxmenu', m => m.hidden) && await p.evaluate(() => !!document.activeElement.closest('[data-row]')), 'Esc closes menu, focus returns to row');
   });
+  await step('kind-filter', async () => {
+    ok(await p.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && !!document.querySelector('.toolbar') && document.querySelector('.toolbar').getBoundingClientRect().top === 0), 'only the file list scrolls: the page, sidebar and toolbar stay put');
+    await p.click('#kindBtn'); await p.waitForSelector('#ctxmenu:not([hidden])');
+    const kinds = await p.$$eval('#ctxmenu [role=menuitem]', b => b.map(x => x.firstChild.textContent.replace('✓ ', '') + (x.disabled ? '-' : '')));
+    ok(kinds.includes('Documents') && kinds.includes('Apps') && kinds.includes('Videos-'), 'kind menu lists kinds and disables empty ones: ' + kinds.join(' | '));
+    await p.click('#ctxmenu [role=menuitem]:has-text("Documents")');
+    const docs = await rows(); ok(docs.length === 2 && docs.every(n => n.endsWith('.pdf')), 'Documents shows only the PDFs: ' + docs.join(', '));
+    ok(await p.$eval('#kindBtn', b => b.classList.contains('on') && b.textContent.includes('Documents')), 'the kind button shows the active filter');
+    await p.click(row('report.pdf') + ' button.name'); await p.keyboard.press('Meta+a');
+    ok((await p.textContent('#selText')).includes('2'), 'select all takes only what the filter shows');
+    await p.keyboard.press('Escape');
+    await p.click('#kindBtn'); await p.click('#ctxmenu [role=menuitem]:has-text("Apps")');
+    ok((await rows()).join() === 'app-release.apk', 'Apps shows only the .apk');
+    await p.click('nav button[data-path$="/Documents"]'); await p.waitForSelector('table, .state');
+    await p.click('nav button[data-path$="/Download"]'); await p.waitForSelector(row('report.pdf'));
+    ok(await p.$eval('#kindBtn', b => !b.classList.contains('on') && b.textContent.includes('All kinds')) && (await rows()).length >= 3, 'the kind filter clears in another folder');
+  }); await p.evaluate(() => { setKind(''); render(); });   // never leave a filter on for the next steps
   await step('copy-conflict', async () => {
     await p.click(row('report.pdf') + ' button.name', {modifiers:['Control']});
     await p.keyboard.press('Control+c'); await p.waitForSelector('#hint:not([hidden])');
