@@ -1,105 +1,68 @@
 # Cellar: next session
 
-Updated 2026-11-22 (third session). Work happens on `main`; release **v0.2.3** is published (v0.2.1 failed to build; leave that tag alone). Everything is pushed. Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
+Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the v0.2.1 tag failed to build; leave it). Everything is pushed. The untracked `linkedin/` folder (a LinkedIn image) stays out of commits.
 
 ## State
-- **Released:** Cellar **0.2.3** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.3: `Cellar.dmg` (universal, bundled Python, ad-hoc signed, not notarized, 36 MB) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window).
-- **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically. Feature cards now include Two panes, Zip and unzip, Drop on the menu bar. The site shows no version number.
-- **CI:** tests green on main (API 148, Browser 84 for `7f2118d`). The release workflow is green for v0.2.3. One flaky test remains (see below).
-- **Installed app:** `/Applications/Cellar.app` is the real **v0.2.3** from the release (universal, bundled Python). Tested on the A55: zip, unzip, two panes, copy between panes. Not tested from the DMG: the menu bar drop and Open Anyway. Dev rebuild: `BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, quit Cellar, move it to /Applications.
-- **To release:** `git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`, then check the `release` workflow and that the DMG is attached. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`). Next version: v0.2.4 for small fixes, v0.3.0 for the next big feature.
-- Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
-
-## Done (all items from the 2026-11-05 list)
-- CI confirmed green.
-- Second UI audit and its fixes (`e9f9a95`, `854d52f`).
-- Duplicate contacts: one Android contact made of several raw contacts (two Google accounts plus WhatsApp). The export now merges by `contact_id` and drops repeated numbers and emails (`af753ac`). The test fixture uses a made-up number.
-- Camera backup: 843 items, 21.79 GB, 0 errors, into `~/Pictures/Cellar/Samsung SM-A556E/Camera`.
-- Leftover "Cellar test" alarms removed from the Clock app.
-- Stale `cellar.py` servers from earlier runs stopped.
-
-## Decided / skipped
-- SD card / USB drive: skipped by the user. The release notes say it's untested on hardware.
-- New folder + Escape keeps `untitled folder` (matches Finder). Left as is.
-- Numbers isn't installed; GridCraft was used for CSV checks.
-
-## Redesign (2026-11-06, on main as b44fd32 and 4de7856; CI green: API 135, Browser 74)
-Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `ui.html`, `mac/Cellar.swift` and `tests/e2e.js`:
-- Six themes (Graphite default, Violet, Midnight, Forest, Ember, Daylight) in Settings, now a page (`#:settings`) instead of a dialog. Match macOS (off by default) switches to Daylight in light mode. Stored in localStorage `dv-theme`, `dv-matchos`, `dv-glass`, `dv-kind`.
-- Liquid Glass: the Mac app loads `/?app=1`; its window has a transparent title bar over `NSGlassEffectView` (macOS 26+) or `NSVisualEffectView`, with a 248×40 `DragStrip` over the top of the sidebar for dragging. The page makes the sidebar see-through (`html.in-app.glass`). In any browser, menus, dialogs, toasts and transfers use backdrop blur. Don't name a root class `app`: it clashes with the `.app` grid.
-- Home (`#:home`) is the first screen: backup finding, storage, quick actions, latest Camera photos, Recent.
-- Sidebar: compact device row (click for details), Home, Favorites (Internal storage, Camera, Pictures, Downloads, Documents; right-click a folder › Add to sidebar), folding Tools and Phone groups, Trash and Settings at the bottom. Recent lives on Home; Duplicates is a tab of Free up space.
-- Colour by kind on folders, file icons and sidebar icons; spotlight hover on tiles; hidden folders sort last; labelled toolbar buttons; Phone controls in two columns.
-- Checked with the phone: Home, folder and file colours, Camera timeline, Phone controls, glass menus, the Mac window. The server now exits when the app is force-quit (CELLAR_PARENT_PID).
-- Tests: loading "/#:x" from another "#:" page doesn't reload, so old toasts stay; reload with goto('/') first.
-
-## Wireless and Show in Finder fixes (2026-11-06)
-- Go wireless failed with "No route to host": Cellar lacked macOS Local Network permission, and adb inherits it from the app that starts it. Fixed: `NSLocalNetworkUsageDescription` + `NSBonjourServices` in build-app.sh, and the app browses for `_adb-tls-connect._tcp` at launch so macOS asks. Verified: Go wireless connects through Cellar.
-- Show in Finder hung: dead WebDAV mounts (one from a test server on 8775) plus duplicate mounts. Fixed in cellar.py: a lock so auto-mount and the button can't mount twice; mounts whose server is gone are cleaned up at startup and before mounting (kill the mount_webdav helper, then `diskutil unmount force`). The Mac app unmounts its own mount on quit, before stopping the server. Unmounting from inside the server while it shuts down deadlocks: don't. Verified: quit takes about 4 s, leaves no mount, relaunch gets port 8765 back.
-- `osascript mount volume` showed a "Connect as" dialog and blocked until it was answered. NetFS with NoUI/Guest/AllowLoopback avoided the dialog but still waited about 90 s inside NetAuthSysAgent. Now Cellar calls `/sbin/mount_webdav -s -S -v <name>` into `~/Library/Application Support/Cellar/Finder/<name>` (/Volumes needs admin rights): 0.7 s, no dialog, and Finder treats it as a volume. The helper process is `webdavfs_agent` on this macOS.
-- WebDAV replies now read the request body once before answering (an unread body reset kept-alive connections).
-- When started by the Mac app, the server restarts adb so it runs under the current build's Local Network permission. An adb left over from an earlier build can't reach the Wi-Fi. Every ad-hoc rebuild is a new app to macOS's privacy checks.
-- Verified on the phone: auto-mount about 7 s after launch, Show in Finder 0.26 s, quit 4 s with no mount left, Go wireless connects.
-- The segmented List/Grid control was restyled (rounded fill, no square outline).
-
-## Brand, site and DMG (2026-11-06)
-- Brand in `brand/`: the cellar door mark (steps are holes; colour follows the theme), Funnel Display wordmark, `make_brand.py` generates every asset plus `mac/AppIcon.iconset` and `mac/Menubar*Template.png`. Guide: `brand/BRAND.md`.
-- App: graphite icon with a white door, menu bar door (filled = connected, outline = no phone), wordmark in the sidebar, favicon recoloured per theme.
-- Live 2026-11-06: site https://hystericmoon.github.io/cellar/ and release v0.2.0 (`Cellar.dmg`, built by CI, universal).
-- Site: `docs/index.html` (GitHub Pages from `/docs`), door colour picker, install steps with Open Anyway.
-- DMG: `mac/make-dmg.sh <version>` builds a universal app and a branded DMG with dmgbuild (create-dmg's Finder scripting didn't save the layout on macOS 26). `.github/workflows/release.yml` does it on a `v*` tag and uploads `Cellar.dmg`. Unsigned: first open needs Open Anyway. Tested 0.2.0 from a Safari-flagged copy: opened fine after Open Anyway.
-- A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
-
-## Done 2026-11-22, second session (shipped as v0.2.2; the v0.2.1 tag exists but its release build failed on a script bug)
-- **Camera stays upright** (`cellar.py`: `tilt_from_gravity`, `read_tilt`, `_watch_tilt`). scrcpy cannot rotate a running camera, so Cellar reads the phone's accelerometer from `dumpsys sensorservice` (newest samples) and restarts scrcpy with a new `--orientation` when the phone turns (read twice in a row). Back camera: `90 - tilt`; front camera: `270 + tilt` (Android's own rule). The window reopens around the same centre and is brought to the front with System Events (`NSRunningApplication.activate` does nothing from a background process on macOS 14+). When the phone's screen is off the sensor sleeps and the newest sample stops changing: Cellar then sends `KEYCODE_WAKEUP`. Checked live: back and front, all turns.
-- **Take a photo** (`take_photo`, `POST /api/photo`, button in Phone controls): opens the Camera app, presses `KEYCODE_CAMERA`, pulls the new file to `~/Downloads/Cellar/Photos`. Needs an unlocked phone (it says so). Checked live on the A55.
-- **Video thumbnails** (`video_thumb`): copies the video (<400 MB) once, Quick Look (`qlmanage -t`) draws a frame, cached like photos. Grid shows a play badge. Not made on non-Mac or for bigger files (icon stays).
-- **Drop files on the menu bar icon** (`MenuDropView` in `Cellar.swift`, `POST /api/dropfiles`): APFS clone into staging, one push job into the phone's Download folder. **Works** (checked live 2026-11-22: the file reached the phone). Debug logging removed (`b6abea3`). The user confirmed the "Sending…" word shows next to the icon. The earlier failure was most likely an old build.
-- **Shared clipboard** (`clipboard_sync`, toggle in Phone controls): scrcpy `--no-video --no-audio --no-window` keeps both clipboards equal. Checked live both ways. It stops when Cellar quits.
-- **Bundled Python:** `mac/fetch-python.sh` downloads python-build-standalone (release 20261110, checksum checked, cached in `~/Library/Caches/Cellar/python`); `build-app.sh` puts it in `Resources/python-<arch>` when `UNIVERSAL=1` or `BUNDLE_PYTHON=1`; `Cellar.swift` prefers it. The DMG grows by about 50 MB. The universal DMG from CI is untested on a clean Mac.
-- MIT `LICENSE` added (holder "hystericmoon").
-- One CI run of `tests` failed 3 browser checks on the Free up space page (biggest file first, saved, trashed); the re-run of the same commit passed. Treat it as a flaky test, but watch it.
-- A test photo (`DCIM/Camera/20261122_105905.jpg`) is on the phone and in `~/Downloads/Cellar/Photos`.
-
-## Done 2026-11-22 (first session)
-- **Only the file list scrolls:** `.app` has `grid-template-rows:minmax(0,1fr)`, `aside,main{min-height:0}`, `html,body{overflow:hidden}`, and `.sr` has `top:0;left:0` (the hidden `#announce` pushed the page 1px). Checked on Home, Settings, Free up space, Apps, Backup, Recent, Trash, Camera, and in `/?app=1`.
-- **Battery:** the page read `/api/info` only when a phone connected. `refreshInfo()` now runs every 30 s (skipped while hidden) and on `visibilitychange`; it redraws only when battery or free space changed, keeps focus, and updates `#hmSub` on Home. The menu bar app already polled every 4 s.
-- **Type filter:** funnel button `#kindBtn` next to Search opens a menu (All kinds, Folders, Images, Videos, Audio, Documents = text+pdf, Archives, Apps, Other) with counts; empty kinds are disabled. `S.kind` filters `visible()`, so select all takes only what's shown; hidden selected items are dropped. It clears when you open another folder or view. Empty state offers "Show all kinds".
-- **Camera upright:** scrcpy sends the sensor picture sideways (this phone: back 90°, front 270°). `build_mirror_cmd` adds `--orientation=90` (back) / `270` (front). Checked: the back camera recording is now portrait. Not checked: the front camera, and ⌥←/⌥→ to turn it in the window.
-- LinkedIn post drafted (text in chat only) and `linkedin/site-tall.png` made from the site. The site says "open source" but the repo has no LICENSE.
-- Testing UI changes on this Mac without the test scripts: run a second server with the watcher off, then open it in the browser pane:
+- **Release:** https://github.com/hystericmoon/cellar/releases/tag/v0.2.3. `Cellar.dmg` (universal, bundled Python, ad-hoc signed, not notarized, 36 MB) plus `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway.
+- **Site:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`). The download button links `releases/latest/download/Cellar.dmg`, so new tags update it. The site shows no version number.
+- **CI:** tests green on main (API 148, Browser 84 at `7f2118d`). The zip, unzip, two-pane and menu tests were added later and have not run in CI yet: watch the next run.
+- **Installed app:** `/Applications/Cellar.app` is v0.2.3 from the release. Dev rebuild: `BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, quit Cellar, move it to /Applications.
+- **To release:** `git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`, then check the `release` workflow and the attached DMG. Local build: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`). Use v0.2.4 for small fixes, v0.3.0 for the next big feature.
+- **Never run** `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
+- **Test a UI change locally** without those scripts: run a second server with the watcher off, then open it in the browser pane. Do not change settings there (it shares `~/.cellar.json`).
   `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
-  (the watcher would run on-connect actions such as auto backup and Finder mount). Don't change settings there: it shares `~/.cellar.json`.
+- Two phones may be on USB (Samsung A55, Redmi M2101K6G). The test server picks the first adb device: switch device in the UI.
 
-## Done 2026-11-22 (third session, shipped as v0.2.3)
-- Menu bar drop works; debug logging removed.
-- **Compress / Extract here** (`run_archive` in `cellar.py`, job kind `archive`, `archiveOp` in `ui.html`): pull, zip or unzip on the Mac with Python `zipfile`, push back. Refuses password zips and paths that climb out. Checked live on the A55 and in the browser pane.
-- **Two panes** (`P2` code in `ui.html`, toolbar `#splitBtn`, ⌘\): a second phone folder. Drag between panes, ⌥ copies, Copy/Move buttons, right-click menu. Open state kept in localStorage `dv-split`. Checked live: copy, drag move, zip.
-- Tests added to `tests/api_test.py` (zip/unzip) and `tests/e2e.js` (menu, two panes). **Not run** (they only run in CI); watch the next CI run.
-- Gaps found by comparing with rivals, still to do: no-USB-debugging mode (MTP), away-from-Wi-Fi transfer, music playlists, Windows support, restore for contacts/messages, messages and notifications on the Mac. Second pane is phone-only (no Mac folder pane).
+## Next work (the user said: another time)
+Suggested v0.3.0: messages and notifications on the Mac, then restore.
+1. Restore for contacts and messages (export exists, import does not).
+2. Messages and notifications on the Mac.
+3. Away-from-Wi-Fi transfer.
+4. Windows support.
+5. A Mac folder pane in the two-pane view (the second pane is phone-only).
+6. Mirror inside the app: A) dock the scrcpy window next to Cellar's (small); B) real in-app video (several days).
 
-## No-USB-debugging mode: tried and dropped (2026-11-22)
-- Tested on the Samsung A55 (USB, File transfer mode, USB debugging off) with `libmtp` 1.1.23 and `aft-mtp-cli` 4.6 from Homebrew. Both tools are uninstalled again.
-- `ptpcamerad` (Mac Image Capture helper) grabs the phone first: libusb claim fails with -3. `kill -9` lets one `mtp-detect` through, but launchd restarts it at once. Afterwards the phone never opened an MTP session ("failed to open session"), even after a replug with the phone unlocked, a kill loop, and a second tool. `mtp-folders`/`mtp-files` and `aft-mtp-cli ls` hung for 1-2 minutes with no output. Not tried: also stopping `icdd`.
-- Decision: not worth it. It would need stopping Mac helpers on every connect and is fragile. Gaps with better value: restore for contacts and messages, messages and notifications on the Mac.
-- If someone retries: route by device id `mtp:<serial>`, basic mode only (browse, save to Mac, add files, new folder, rename, delete with "deleted for good" confirm), hide shell features, match MTP to adb by serial, one long-lived MTP session behind a lock, bundle the binary with the LGPL text, fake MTP tool in `tests/fakebin`.
-
-## Proposed, waiting for the user
-- **Feature gaps found by comparing with rivals (the user said: do them another time):** 1) restore for contacts and messages (export exists, import does not); 2) messages and notifications on the Mac; 3) away-from-Wi-Fi transfer; 4) Windows support; 5) no-USB-debugging mode (dropped, see above; only a phone companion app or a file-server app would work); 6) a Mac folder pane in the two-pane view; 7) mirror inside the app (A: dock the scrcpy window next to Cellar's, small; B: real in-app video, several days). Music playlists were dropped by the user. Suggested next big feature (v0.3.0): messages and notifications on the Mac, then restore.
+Dropped: music playlists (user), SD card / USB drive hardware test (user; release notes say untested), no-USB-debugging mode (see below).
 
 ## Still open
-1. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
-2. **Clean-Mac install** of the DMG: skipped by the user. Python is bundled, so no Command Line Tools prompt is expected; untested on a clean Mac.
-3. **Not verified:** Open Anyway with the CI-built DMG (v0.2.3 was installed by copying from the mounted DMG, with no download quarantine flag). The menu bar drop was checked with a local build, not the release build.
-4. **Flaky test:** the `space` step ("biggest file is first", "file saved to the Mac first", "then moved to the phone Trash") failed in two CI runs and passed on re-run. Cause unknown: the first row on the Free up space page was not `report.pdf`. `tests/e2e.js` now prints the first five names on failure (`7f2118d`). Next time it fails, read the CI log for "saw:" and fix the cause.
-5. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway; `make-dmg.sh` notes where signing goes.
-6. Impeccable skill update available (v4.8.0). Only on request.
-7. Two phones were on USB during this session (a Samsung A55 and a Redmi M2101K6G). The local test server picks the first adb device, so switch device in the UI when testing.
+1. **GitHub support ticket** to purge old commits `ae162fa`, `5a6acde`, `f6b8181` (not purged on 2026-11-06). Done when `github.com/hystericmoon/cellar/commit/ae162fa` shows "not found".
+2. **Not verified:** the Open Anyway flow with the CI-built DMG; the menu bar drop in the release build (checked only with a local build); install on a clean Mac (Python is bundled, so no Command Line Tools prompt is expected).
+3. **Flaky test:** the `space` step ("biggest file is first", "file saved to the Mac first", "then moved to the phone Trash") failed in two CI runs and passed on re-run. Cause unknown: the first row was not `report.pdf`. `tests/e2e.js` now prints the first five names on failure. Next failure: read the CI log for "saw:" and fix the cause.
+4. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway. `make-dmg.sh` notes where signing goes.
+5. Impeccable skill update available (v4.8.0). Only on request.
 
-## Done 2026-11-06 (this session)
-- CI green for ba10e10; real Finder drag test passed (md5 match, Keep both); fresh wireless pairing works (VPN off). Drag-test files were moved to Cellar's Trash on the phone and the Mac Trash.
-- Brand, site, DMG and release (see the section above). Site photos: 16 Unsplash images, no people, `docs/img/photos/CREDITS.txt`.
+## How the Mac app works (facts that cost time to find)
+- **Window:** loads `/?app=1`. Transparent title bar over `NSGlassEffectView` (macOS 26+) or `NSVisualEffectView`; a 248×40 `DragStrip` sits over the sidebar. The page makes the sidebar see-through with `html.in-app.glass`. Do not name a root class `app`: it clashes with the `.app` grid.
+- **Server life:** the server exits when the app is force-quit (`CELLAR_PARENT_PID`). On start it restarts adb so adb runs under the current build's Local Network permission. Every ad-hoc rebuild is a new app to macOS privacy checks.
+- **Local Network:** `NSLocalNetworkUsageDescription` and `NSBonjourServices` are in `build-app.sh`; the app browses `_adb-tls-connect._tcp` at launch so macOS asks. Without it, Go wireless fails with "No route to host".
+- **Show in Finder:** Cellar runs `/sbin/mount_webdav -s -S -v <name>` into `~/Library/Application Support/Cellar/Finder/<name>` (0.7 s, no dialog; `/Volumes` needs admin rights). `osascript mount volume` and NetFS both blocked. A lock stops double mounts; dead mounts are cleaned at startup and before mounting. The app unmounts on quit, before it stops the server. Never unmount from inside the server while it shuts down: it deadlocks. WebDAV replies read the request body once before answering.
+- **Camera upright:** scrcpy cannot rotate a running camera. `cellar.py` (`tilt_from_gravity`, `read_tilt`, `_watch_tilt`) reads the accelerometer from `dumpsys sensorservice` and restarts scrcpy with a new `--orientation` (back: `90 - tilt`; front: `270 + tilt`). When the screen is off the sensor sleeps: Cellar sends `KEYCODE_WAKEUP`. The window is raised with System Events.
+- **Take a photo:** `take_photo`, `POST /api/photo`. Opens Camera, presses `KEYCODE_CAMERA`, pulls the file to `~/Downloads/Cellar/Photos`. Needs an unlocked phone.
+- **Video thumbnails:** `video_thumb` copies videos under 400 MB once and draws a frame with `qlmanage -t`.
+- **Menu bar drop:** `MenuDropView` in `Cellar.swift`, `POST /api/dropfiles`. APFS clone into staging, then one push job to the phone's Download folder.
+- **Shared clipboard:** `clipboard_sync` runs scrcpy `--no-video --no-audio --no-window`. Stops when Cellar quits.
+- **Compress / Extract here:** `run_archive` (job kind `archive`), `archiveOp` in `ui.html`. Zips and unzips on the Mac with `zipfile`. Refuses password zips and paths that climb out.
+- **Two panes:** `P2` code in `ui.html`, `#splitBtn`, ⌘\. State in localStorage `dv-split`.
+- **Bundled Python:** `mac/fetch-python.sh` downloads python-build-standalone (release 20261110, checksum checked, cached in `~/Library/Caches/Cellar/python`). `build-app.sh` copies it to `Resources/python-<arch>` when `UNIVERSAL=1` or `BUNDLE_PYTHON=1`. `Cellar.swift` prefers it.
+
+## UI facts
+- Six themes (Graphite default, Violet, Midnight, Forest, Ember, Daylight) in Settings (`#:settings`, a page). Match macOS switches to Daylight in light mode. localStorage keys: `dv-theme`, `dv-matchos`, `dv-glass`, `dv-kind`.
+- Home (`#:home`) is the first screen. Sidebar: device row, Home, Favorites, Tools and Phone groups, Trash and Settings at the bottom. Recent lives on Home; Duplicates is a tab of Free up space.
+- Only the file list scrolls: `.app` has `grid-template-rows:minmax(0,1fr)`, `aside,main{min-height:0}`, `html,body{overflow:hidden}`, `.sr{top:0;left:0}`.
+- `refreshInfo()` polls `/api/info` every 30 s (skipped while hidden) and on `visibilitychange`.
+- Type filter: `#kindBtn` next to Search; `S.kind` filters `visible()`; it clears when you open another folder or view.
+- Tests: loading `/#:x` from another `#:` page does not reload, so old toasts stay. Call `goto('/')` first.
+- New folder + Escape keeps `untitled folder` (matches Finder). Left as is.
+
+## Brand, site, DMG
+- Brand in `brand/` (guide: `brand/BRAND.md`). `make_brand.py` generates every asset plus `mac/AppIcon.iconset` and `mac/Menubar*Template.png`. Menu bar door: filled = connected, outline = no phone.
+- Site: `docs/index.html`, with a door colour picker and install steps. Photos: `docs/img/photos` (credits in `CREDITS.txt`).
+- DMG: `make-dmg.sh` uses dmgbuild (create-dmg's Finder scripting did not save the layout on macOS 26). Unsigned.
+- MIT `LICENSE` (holder "hystericmoon").
+
+## No-USB-debugging mode: tried and dropped (2026-11-22)
+Tested on the A55 with `libmtp` and `aft-mtp-cli`. Mac's `ptpcamerad` grabs the phone first (libusb claim fails with -3). Killing it works once, then launchd restarts it. The phone never opened an MTP session; listing hung for minutes. Not tried: also stopping `icdd`. Not worth it. If someone retries: route by device id `mtp:<serial>`, basic mode only, one long-lived MTP session behind a lock, bundle the binary with the LGPL text, add a fake MTP tool to `tests/fakebin`. Only a phone companion app or a file-server app would work well.
 
 ## Prompt to paste after /clear
 
-> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.2.3 is released as a DMG and the site is at hystericmoon.github.io/cellar. Read `NEXT_SESSION.md`, then `HANDOFF.md` and `README.md`. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
+> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.2.3 is released as a DMG and the site is at hystericmoon.github.io/cellar. Read `NEXT_SESSION.md` only; read `HANDOFF.md` or `README.md` only if the task needs them. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
