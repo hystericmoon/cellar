@@ -2057,6 +2057,35 @@ def sync_auto(serial):
 # ---------------------------------------------------------------- thumbnails
 
 _thumb_sem = threading.Semaphore(3)
+_video_sem = threading.Semaphore(1)       # videos are big: make one preview at a time
+VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".3gp", ".mkv", ".webm", ".avi"}
+VIDEO_THUMB_MAX = 400 * 1024 * 1024        # bigger videos keep the plain icon: copying them just for a picture costs too much
+
+
+def video_thumb(serial, path, jpg, px, size):
+    """A still picture from a video. Copies the video from the phone once (the picture is then cached), and lets
+    macOS Quick Look draw it. Raises AdbError when this Mac can't."""
+    if not IS_MAC or not os.path.exists("/usr/bin/qlmanage"):
+        raise AdbError("Video previews need a Mac")
+    if int(size or 0) > VIDEO_THUMB_MAX:
+        raise AdbError("That video is too big for a preview")
+    work = tempfile.mkdtemp(prefix="cellar-vt-")
+    try:
+        src = os.path.join(work, "v" + os.path.splitext(path)[1].lower())
+        with _video_sem:
+            with open(src, "wb") as f:
+                r = subprocess.run([ADB, "-s", serial, "exec-out", f"cat {q(path)}"], stdout=f, stderr=subprocess.DEVNULL, timeout=300)
+            if r.returncode != 0 or os.path.getsize(src) == 0:
+                raise AdbError("Couldn't read that video")
+            subprocess.run(["/usr/bin/qlmanage", "-t", "-s", str(px), "-o", work, src], capture_output=True, timeout=60)
+        png = src + ".png"
+        if not os.path.exists(png):
+            raise AdbError("Couldn't make a preview")
+        r = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "75", png, "--out", jpg], capture_output=True)
+        if r.returncode != 0:
+            raise AdbError("Couldn't make a preview")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def thumb_file(serial, path, mtime, size, px):
@@ -2070,6 +2099,9 @@ def thumb_file(serial, path, mtime, size, px):
     if os.path.exists(raw):
         return raw, mimetypes.guess_type(path)[0] or "application/octet-stream"
     os.makedirs(folder, exist_ok=True)
+    if os.path.splitext(path)[1].lower() in VIDEO_EXTS:
+        video_thumb(serial, path, jpg, px, size)
+        return jpg, "image/jpeg"
     with _thumb_sem:
         fd, tmp = tempfile.mkstemp(suffix=os.path.splitext(path)[1])
         with os.fdopen(fd, "wb") as f:

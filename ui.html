@@ -165,6 +165,8 @@ tr:hover .rowact,tr:focus-within .rowact{opacity:1}
 .thumb{aspect-ratio:1;background:var(--hover);display:grid;place-items:center;color:var(--muted);overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb svg{width:34px;height:34px}
+.thumb.vid{position:relative}
+.thumb.vid:has(img)::after{content:"";position:absolute;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 7l9 5-9 5z'/%3E%3C/svg%3E") center/20px no-repeat;pointer-events:none}
 .thumb.folder{background:none;color:var(--text);aspect-ratio:auto;height:auto;place-items:start;padding:14px 12px 0}
 .thumb.folder svg{width:24px;height:24px}
 .tile:has(.thumb.folder) .cap{padding-top:8px}
@@ -981,8 +983,8 @@ function render() {
     const counts = {}; if (byDay) list.forEach(e => { if (!e.dir) { const k = dayKey(e.mtime); counts[k] = (counts[k] || 0) + 1; } });
     list.forEach((e, i) => { const k = kind(e);
       if (byDay && !e.dir) { const dk = dayKey(e.mtime); if (dk !== lastDay) { lastDay = dk; html += `<h3 class="dayhead">${esc(dayLabel(e.mtime))}<span>${counts[dk]} item${counts[dk] > 1 ? "s" : ""}</span></h3>`; } }
-      const th = k === "image" ? `<img loading="lazy" decoding="async" alt="" src="${esc(thumbUrl(e))}" onerror="this.replaceWith(document.createRange().createContextualFragment('${svg("image").replace(/"/g,"&quot;")}'))">` : svg(k, 1.5);
-      html += `<div class="tilewrap${isCut(e) ? " cut" : ""}${e.name.startsWith(".") ? " hiddenf" : ""}" data-row="${i}" ${e.dir ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><button type="button" class="tile ${hueOf(e)}" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ", " + fmtSize(e.size)}${isCut(e) ? ", cut" : ""}"><div class="thumb ${k === "folder" ? "folder" : ""}">${th}</div><div class="cap"><span class="nm">${esc(e.name)}</span><small>${e.dir ? "Folder" : fmtSize(e.size)}</small></div></button>${cb(e, i)}</div>`; });
+      const th = k === "image" || k === "video" ? `<img loading="lazy" decoding="async" alt="" src="${esc(thumbUrl(e))}" onerror="this.replaceWith(document.createRange().createContextualFragment('${svg(k).replace(/"/g,"&quot;")}'))">` : svg(k, 1.5);
+      html += `<div class="tilewrap${isCut(e) ? " cut" : ""}${e.name.startsWith(".") ? " hiddenf" : ""}" data-row="${i}" ${e.dir ? `data-drop="${esc(ep(e))}"` : ""} ${drag ? 'draggable="true"' : ""}><button type="button" class="tile ${hueOf(e)}" data-i="${i}" aria-label="${esc(e.name)}${e.dir ? ", folder" : ", " + fmtSize(e.size)}${isCut(e) ? ", cut" : ""}"><div class="thumb ${k === "folder" ? "folder" : ""}${k === "video" ? " vid" : ""}">${th}</div><div class="cap"><span class="nm">${esc(e.name)}</span><small>${e.dir ? "Folder" : fmtSize(e.size)}</small></div></button>${cb(e, i)}</div>`; });
     c.innerHTML = `<div class="grid">${html}</div>`;
   } else {
     const col = (key, label, cls="") => { const on = S.sort.key === key && S.mode !== "recent";
