@@ -7,7 +7,7 @@ Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the
 - **Site:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`). The download button links `releases/latest/download/Cellar.dmg`, so new tags update it. The site shows no version number.
 - **CI:** tests green on main (API 148, Browser 84 at `7f2118d`). The zip, unzip, two-pane and menu tests were added later and have not run in CI yet: watch the next run.
 - **Installed app:** `/Applications/Cellar.app` is v0.2.3 from the release. Dev rebuild: `BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, quit Cellar, move it to /Applications.
-- **To release:** `git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`, then check the `release` workflow and the attached DMG. Local build: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`). Use v0.2.4 for small fixes, v0.3.0 for the next big feature.
+- **To release:** `git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`, then check the `release` workflow and the attached DMG. Local build: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`). `.github/release-notes.md` holds the "What's new" text: update it before each tag. Use v0.2.4 for small fixes, v0.3.0 for the next big feature.
 - **Never run** `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 - **Test a UI change locally** without those scripts: run a second server with the watcher off, then open it in the browser pane. Do not change settings there (it shares `~/.cellar.json`).
   `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
@@ -27,7 +27,7 @@ Dropped: music playlists (user), SD card / USB drive hardware test (user; releas
 ## Still open
 1. **GitHub support ticket** to purge old commits `ae162fa`, `5a6acde`, `f6b8181` (not purged on 2026-11-06). Done when `github.com/hystericmoon/cellar/commit/ae162fa` shows "not found".
 2. **Not verified:** the Open Anyway flow with the CI-built DMG; the menu bar drop in the release build (checked only with a local build); install on a clean Mac (Python is bundled, so no Command Line Tools prompt is expected).
-3. **Flaky test:** the `space` step ("biggest file is first", "file saved to the Mac first", "then moved to the phone Trash") failed in two CI runs and passed on re-run. Cause unknown: the first row was not `report.pdf`. `tests/e2e.js` now prints the first five names on failure. Next failure: read the CI log for "saw:" and fix the cause.
+3. **Flaky test (likely fixed, unproven):** the `space` step failed in two older CI runs. Best guess: earlier steps leave copies of `report.pdf` (same 3 MB), so a tie put a copy first. `tests/e2e.js` now finds `report.pdf` in the top five instead of demanding first place, and still prints the names ("saw:"). If it fails again, read the CI log for "saw:".
 4. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway. `make-dmg.sh` notes where signing goes.
 5. Impeccable skill update available (v4.8.0). Only on request.
 

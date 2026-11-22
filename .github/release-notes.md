@@ -1,10 +1,12 @@
 ## What's new
 
+- **Two panes:** open a second phone folder beside the first (⌘\). Drag between them, or use Copy and Move.
+- **Compress and Extract here:** zip files or folders, or open a .zip, from the right-click menu.
+- **Drop files on the menu bar icon** to send them to the phone's Download folder.
 - The phone camera stays upright when you turn the phone, front or back.
-- Take a photo with the phone from the Mac.
-- Video thumbnails, drop files on the menu bar icon, shared clipboard.
-- Cellar now carries its own Python: no Command Line Tools needed on a clean Mac.
-- Type filter, live battery, and fixes to the sticky layout.
+- Take a photo with the phone from the Mac. Video thumbnails. Shared clipboard.
+- Cellar carries its own Python: no Command Line Tools needed on a clean Mac.
+- Type filter, live battery, and layout fixes.
 - MIT license.
 
 ## Install

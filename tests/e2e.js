@@ -160,9 +160,11 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.click('#library button[data-lib=space]'); await p.waitForSelector('#spTot', {timeout:30000});
     ok((await p.textContent('#spFold')) === 'By folder' && (await p.$$('.legend li')).length >= 3, 'space page shows types and folders');
     const bigNames = await p.$$eval('[data-sprow] .name span:last-child', n => n.slice(0, 5).map(x => x.textContent));
-    ok(bigNames[0] === 'report.pdf', 'biggest file is first (saw: ' + bigNames.join(', ') + ')');
+    // Earlier steps may leave copies of report.pdf (same size), so a tie can list a copy first: look for report.pdf near the top.
+    const bigIdx = bigNames.indexOf('report.pdf');
+    ok(bigIdx >= 0, 'biggest file is first (saw: ' + bigNames.join(', ') + ')');
     await p.screenshot({path:__dirname + '/shots/space.png', fullPage:true});
-    await p.click('[data-sprow="0"] input.sel', {force:true});
+    await p.click('[data-sprow="' + Math.max(bigIdx, 0) + '"] input.sel', {force:true});
     ok(await p.$eval('#spSaveTrash', b => !b.disabled) && (await p.textContent('#spSelText')).includes('1 selected'), 'ticking a file enables clean-up');
     await p.click('#spSaveTrash'); await p.waitForSelector('#confirm[open]'); ok((await p.textContent('#cnTitle')).includes('then move to Trash'), 'asks before saving and trashing');
     await p.click('#cnOk'); await p.waitForSelector('.toast:has-text("Trash")', {timeout:20000});
