@@ -46,6 +46,8 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 - Transfer queue with speed, time left and cancel. You can keep browsing while it runs.
 - Search the whole phone (type, then Enter), plus a Recent view.
 - Photo timeline in Camera, with fast thumbnails made once and kept on your Mac.
+- Compress and Extract here (right-click): zip files or folders, or open a .zip, next to the originals. Cellar does the packing on your Mac, so big archives take a moment.
+- Two panes (button in the toolbar, or ⌘\\): a second phone folder beside this one. Drag between them (hold ⌥ to copy), or use the Copy and Move buttons.
 - Open with Mac app: edit a phone file in Preview, Pages and so on. Saving copies it back to the phone.
 
 **Mac integration**

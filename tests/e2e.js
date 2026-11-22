@@ -21,6 +21,18 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     await p.keyboard.press('ArrowDown'); await p.keyboard.press('Escape');
     ok(await p.$eval('#ctxmenu', m => m.hidden) && await p.evaluate(() => !!document.activeElement.closest('[data-row]')), 'Esc closes menu, focus returns to row');
   });
+  await step('menu-compress', async () => {
+    await p.click(row('report.pdf') + ' button.name', {button:'right'}); await p.waitForSelector('#ctxmenu:not([hidden])');
+    const items = await p.$$eval('#ctxmenu [role=menuitem]', b => b.map(x => x.firstChild.textContent));
+    ok(items.includes('Compress') && !items.includes('Extract here'), 'menu offers Compress, and Extract only for .zip files');
+    await p.keyboard.press('Escape');
+  });
+  await step('two-panes', async () => {
+    await p.click('#splitBtn'); await p.waitForSelector('#pane2 .p2row');
+    ok(await p.getAttribute('#splitBtn', 'aria-pressed') === 'true' && await p.locator('#pane2 .p2row').count() > 0, 'second pane opens with a folder list');
+    await p.click('#splitBtn'); await p.waitForTimeout(200);
+    ok(!(await p.isVisible('#pane2')), 'second pane closes');
+  });
   await step('kind-filter', async () => {
     ok(await p.evaluate(() => document.scrollingElement.scrollHeight <= innerHeight && !!document.querySelector('.toolbar') && document.querySelector('.toolbar').getBoundingClientRect().top === 0), 'only the file list scrolls: the page, sidebar and toolbar stay put');
     await p.click('#kindBtn'); await p.waitForSelector('#ctxmenu:not([hidden])');

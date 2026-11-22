@@ -814,7 +814,107 @@ def run_install(j):
         shutil.rmtree(stage, ignore_errors=True)
 
 
-RUNNERS = {"pull": run_pull, "push": run_push, "phoneop": run_phoneop, "install": run_install}
+def run_archive(j):
+    """Zip some items, or unzip a .zip. The phone has no zip tool, so this works on the Mac:
+    pull, pack or unpack, push the result back next to the originals."""
+    import zipfile
+    sp, serial = j["_spec"], j["serial"]
+    op, dest, items = sp["op"], clean_path(sp["dir"]), sp["items"]
+    os.makedirs(STAGE_ROOT, exist_ok=True)
+    work = tempfile.mkdtemp(prefix="arc-", dir=STAGE_ROOT)
+    j["items_total"] = 1
+    try:
+        paths = [clean_path(it["path"]) for it in items]
+        size = max(sum(batch_sizes(serial, paths)), 1)
+        j["total"] = size * 3          # pull + pack + push
+        src_dir = os.path.join(work, "src")
+        os.makedirs(src_dir)
+        taken, locals_ = set(), []
+        for path in paths:                       # 1. pull
+            check_cancel(j)
+            name = clean_name(posixpath.basename(path))
+            if name in taken:
+                name = keep_both_name(name, taken)
+            taken.add(name)
+            target = os.path.join(src_dir, name)
+            j["current"] = name
+            rc, out = run_proc(j, [ADB, "-s", serial, "pull", "-a", path, target], lambda: set_progress(j, min(local_size(src_dir), size)))
+            if rc != 0:
+                raise AdbError(f"{name}: {adb_msg(out)}")
+            locals_.append(name)
+        set_progress(j, size)
+        names_on_phone = phone_names(serial, dest)
+        done_bytes = [size]
+        if op == "zip":                          # 2. pack
+            base = locals_[0] if len(locals_) == 1 else "Archive"
+            final = keep_both_name(base + ".zip", names_on_phone | {base + ".zip"}) if base + ".zip" in names_on_phone else base + ".zip"
+            out_path = os.path.join(work, final)
+            j["current"] = final
+            with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+                for name in locals_:
+                    top = os.path.join(src_dir, name)
+                    if os.path.isdir(top):
+                        z.write(top, name + "/")
+                        for root, dirs, files in os.walk(top):
+                            for d in dirs:
+                                full = os.path.join(root, d)
+                                z.write(full, os.path.relpath(full, src_dir).replace(os.sep, "/") + "/")
+                            for f in files:
+                                check_cancel(j)
+                                full = os.path.join(root, f)
+                                z.write(full, os.path.relpath(full, src_dir).replace(os.sep, "/"))
+                                done_bytes[0] += os.path.getsize(full)
+                                set_progress(j, min(done_bytes[0], size * 2))
+                    else:
+                        check_cancel(j)
+                        z.write(top, name)
+                        done_bytes[0] += os.path.getsize(top)
+                        set_progress(j, min(done_bytes[0], size * 2))
+            push_local, push_name = out_path, final
+        else:                                    # 2. unpack
+            zpath = os.path.join(src_dir, locals_[0])
+            stem = os.path.splitext(locals_[0])[0] or "Extracted"
+            folder = keep_both_name(stem, names_on_phone | {stem}, True) if stem in names_on_phone else stem
+            out_dir = os.path.join(work, folder)
+            os.makedirs(out_dir)
+            j["current"] = folder
+            try:
+                zf = zipfile.ZipFile(zpath)
+            except zipfile.BadZipFile:
+                raise AdbError("That is not a valid zip file.")
+            with zf:
+                root = os.path.realpath(out_dir)
+                for info in zf.infolist():
+                    check_cancel(j)
+                    target = os.path.realpath(os.path.join(out_dir, info.filename))
+                    if not (target == root or target.startswith(root + os.sep)):
+                        raise AdbError("The zip file has an unsafe path in it.")
+                    if info.flag_bits & 0x1:
+                        raise AdbError("This zip file needs a password. Cellar can't open it.")
+                    zf.extract(info, out_dir)
+                    done_bytes[0] += info.file_size
+                    set_progress(j, min(done_bytes[0], size * 2))
+            push_local, push_name = out_dir, folder
+        set_progress(j, size * 2)
+        check_cancel(j)                          # 3. push
+        target = posixpath.join(dest, push_name)
+        pushed = max(local_size(push_local), 1)
+        j["current"] = push_name
+        try:
+            rc, out = run_proc(j, [ADB, "-s", serial, "push", push_local, target],
+                               lambda: set_progress(j, size * 2 + size * min(remote_bytes(serial, target), pushed) // pushed), tick=1.0)
+        except Cancelled:
+            sh(serial, f"rm -rf {q(target)}")
+            raise
+        if rc != 0:
+            raise AdbError(f"{push_name}: {adb_msg(out)}")
+        j["items_done"] = 1
+        j["result"] = {"created": [target], "dir": dest, "op": op}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+RUNNERS = {"pull": run_pull, "push": run_push, "phoneop": run_phoneop, "install": run_install, "archive": run_archive}
 
 
 def stage_path(stage_id, rel):
@@ -3384,6 +3484,14 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
                 verb = "Move" if op == "move" else "Copy"
                 title = d.get("title") or (f"{verb} {n} items to {posixpath.basename(dest) or '/'}" if n > 1 else f"{verb} “{posixpath.basename(items[0]['path'])}” to {posixpath.basename(dest) or '/'}")
                 j = new_job("phoneop", s, title, {"op": op, "items": items, "dest": dest}, lane="phone")
+            elif kind == "archive":
+                op = "unzip" if d.get("op") == "unzip" else "zip"
+                items = [{"path": clean_path(i["path"])} for i in d.get("items", [])]
+                if not items or (op == "unzip" and len(items) != 1):
+                    raise AdbError("Nothing to " + ("extract" if op == "unzip" else "compress"))
+                first = posixpath.basename(items[0]["path"])
+                title = f"Extract “{first}”" if op == "unzip" else (f"Compress “{first}”" if len(items) == 1 else f"Compress {len(items)} items")
+                j = new_job("archive", s, title, {"op": op, "items": items, "dir": clean_path(d.get("dir") or posixpath.dirname(items[0]["path"]))})
             elif kind == "install":
                 stage_path(d.get("stage"), "x")
                 j = new_job("install", s, d.get("title") or "Install app", {"stage": d["stage"]})

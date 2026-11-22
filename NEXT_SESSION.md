@@ -71,6 +71,13 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
   `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
   (the watcher would run on-connect actions such as auto backup and Finder mount). Don't change settings there: it shares `~/.cellar.json`.
 
+## Done 2026-11-22 (third session, not released yet)
+- Menu bar drop works; debug logging removed.
+- **Compress / Extract here** (`run_archive` in `cellar.py`, job kind `archive`, `archiveOp` in `ui.html`): pull, zip or unzip on the Mac with Python `zipfile`, push back. Refuses password zips and paths that climb out. Checked live on the A55 and in the browser pane.
+- **Two panes** (`P2` code in `ui.html`, toolbar `#splitBtn`, ⌘\\): a second phone folder. Drag between panes, ⌥ copies, Copy/Move buttons, right-click menu. Open state kept in localStorage `dv-split`. Checked live: copy, drag move, zip.
+- Tests added to `tests/api_test.py` (zip/unzip) and `tests/e2e.js` (menu, two panes). **Not run** (they only run in CI); watch the next CI run.
+- Gaps found by comparing with rivals, still to do: no-USB-debugging mode (MTP), away-from-Wi-Fi transfer, music playlists, Windows support, restore for contacts/messages, messages and notifications on the Mac. Second pane is phone-only (no Mac folder pane).
+
 ## Proposed, waiting for the user
 - **Mirror inside the app.** (The user chose to skip it for now.) A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
 - **Feature ideas not built yet:** none open. The user was offered the list on 2026-11-22 and everything except in-app mirroring was built.
