@@ -100,6 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
     }
 
     private func pythonPath() -> String {
+        // The Python inside the app (release builds) needs nothing installed on the Mac.
+        #if arch(arm64)
+        let bundled = resourcePath("python-arm64/bin/python3")
+        #else
+        let bundled = resourcePath("python-x86_64/bin/python3")
+        #endif
+        if let b = bundled, FileManager.default.isExecutableFile(atPath: b) { return b }
         for p in ["/usr/bin/python3", "/opt/homebrew/bin/python3", "/usr/local/bin/python3"] where FileManager.default.isExecutableFile(atPath: p) {
             return p
         }

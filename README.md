@@ -23,8 +23,7 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
      1. Open Cellar. When macOS says it can't verify it, click **Done**.
      2. Go to **System Settings › Privacy & Security**, scroll down and click **Open Anyway**, then confirm.
 
-     After that it opens normally. If macOS offers to install its free Command Line Tools, accept:
-     Cellar runs on the Python that comes with them.
+     After that it opens normally. Cellar carries its own Python, so nothing else needs installing.
    - **Build it yourself:** double-click **Build Mac App.command**. It builds `Cellar.app`
      and offers to move it to Applications. It needs Apple's free Command Line Tools, which the
      script offers to install. A copy built on your Mac skips the Open Anyway step.
@@ -67,7 +66,11 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 - Duplicates: finds files with identical content, lets you pick the copy to keep, and moves the rest to the Trash.
 - Contacts & calendar: exports contacts (.vcf and .csv), call history (.csv) and calendar (.ics) to `~/Downloads/Cellar/Exports/<date>`.
 - Text messages: saves them as PDF or CSV. Some phones refuse to share messages; Cellar says so. PDF needs Chrome, Edge or Brave on the Mac, otherwise it saves a web page you can print to PDF.
-- Phone camera as a webcam on the Mac (Android 12+, scrcpy 2.2+), from the mirror dialog.
+- Phone camera as a webcam on the Mac (Android 12+, scrcpy 2.2+), from the mirror dialog. The picture stays upright when you turn the phone, front or back.
+- Take a photo with the phone from the Mac (Phone controls). It saves to `~/Downloads/Cellar/Photos`. The phone must be unlocked.
+- Video thumbnails in the grid (videos under 400 MB; made once and kept).
+- Drop files on the menu bar icon to send them to the phone's Download folder.
+- Share the clipboard: copy on the Mac, paste on the phone, and the other way round (Phone controls, needs scrcpy).
 - Phone controls: ring my phone, music and volume keys, Do Not Disturb. Also in the menu bar. Not every phone supports every one.
 - Sync folders: two-way sync between a Mac folder and a phone folder, with a preview before the first sync. Files changed on both sides are kept as both versions. Replaced or removed files go to the phone's Trash or `~/Downloads/Cellar/Sync versions`, never deleted outright.
 

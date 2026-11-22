@@ -16,6 +16,8 @@ fi
 
 # UNIVERSAL=1 builds for both Apple silicon and Intel (used for the downloadable DMG).
 # CELLAR_VERSION sets the version shown in Finder (default: today's date).
+# BUNDLE_PYTHON=1 puts a standalone Python inside the app (default for UNIVERSAL=1), so a clean Mac needs no
+# Command Line Tools to run it. A local build (BUNDLE_PYTHON=0) uses the Python already on this Mac.
 # NO_INSTALL=1 skips the "move to Applications" question.
 if [ "${UNIVERSAL:-0}" = 1 ]; then ARCHS="arm64 x86_64"; else ARCHS="$(uname -m)"; fi
 echo "Building Cellar.app for ${ARCHS}…"
@@ -33,6 +35,9 @@ lipo -create "${BINS[@]}" -output "$APP/Contents/MacOS/Cellar"
 rm -f "${BINS[@]}"
 
 cp "$ROOT/cellar.py" "$ROOT/ui.html" "$APP/Contents/Resources/"
+if [ "${BUNDLE_PYTHON:-${UNIVERSAL:-0}}" = 1 ]; then
+  for ARCH in $ARCHS; do ./fetch-python.sh "$ARCH" "$APP/Contents/Resources/python-$ARCH"; done
+fi
 cp -R "$ROOT/fonts" "$APP/Contents/Resources/fonts"
 cp MenubarTemplate.png MenubarTemplate@2x.png MenubarOffTemplate.png MenubarOffTemplate@2x.png "$APP/Contents/Resources/"
 # If this folder came from a downloaded zip, the copied files carry macOS's download flag, and an
