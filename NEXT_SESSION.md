@@ -1,13 +1,13 @@
 # Cellar: next session
 
-Updated 2026-11-22 (second session). Work happens on `main`; release v0.2.2 is published (v0.2.1 failed to build; leave that tag alone). Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
+Updated 2026-11-22 (third session). Work happens on `main`; release **v0.2.3** is published (v0.2.1 failed to build; leave that tag alone). Everything is pushed. Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
 
 ## State
-- **Released:** Cellar **0.2.0** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.0: `Cellar.dmg` (universal, ad-hoc signed, not notarized) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window). v0.1.0 (arm64 zip) is older.
-- **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically.
-- **CI:** tests green on main (API 136, Browser 81 for `22c6668`). The release workflow is green for v0.2.0.
-- **Installed app:** `/Applications/Cellar.app` is a local dev build (version `0.2.2-dev`, with the debug logging above, bundled Python, arm64 only). Older copies are in the Mac Trash. The real v0.2.2 from the release was installed and tested earlier today: camera upright, video thumbnails, clipboard and server drop all worked. Rebuild: `BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, quit Cellar, move it to /Applications.
-- **To release:** `git tag -a v0.2.1 -m ... && git push origin v0.2.1`. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`).
+- **Released:** Cellar **0.2.3** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.3: `Cellar.dmg` (universal, bundled Python, ad-hoc signed, not notarized, 36 MB) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window).
+- **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically. Feature cards now include Two panes, Zip and unzip, Drop on the menu bar. The site shows no version number.
+- **CI:** tests green on main (API 148, Browser 84 for `7f2118d`). The release workflow is green for v0.2.3. One flaky test remains (see below).
+- **Installed app:** `/Applications/Cellar.app` is the real **v0.2.3** from the release (universal, bundled Python). Tested on the A55: zip, unzip, two panes, copy between panes. Not tested from the DMG: the menu bar drop and Open Anyway. Dev rebuild: `BUNDLE_PYTHON=1 NO_INSTALL=1 mac/build-app.sh`, quit Cellar, move it to /Applications.
+- **To release:** `git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`, then check the `release` workflow and that the DMG is attached. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`). Next version: v0.2.4 for small fixes, v0.3.0 for the next big feature.
 - Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 
 ## Done (all items from the 2026-11-05 list)
@@ -71,7 +71,7 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
   `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
   (the watcher would run on-connect actions such as auto backup and Finder mount). Don't change settings there: it shares `~/.cellar.json`.
 
-## Done 2026-11-22 (third session, not released yet)
+## Done 2026-11-22 (third session, shipped as v0.2.3)
 - Menu bar drop works; debug logging removed.
 - **Compress / Extract here** (`run_archive` in `cellar.py`, job kind `archive`, `archiveOp` in `ui.html`): pull, zip or unzip on the Mac with Python `zipfile`, push back. Refuses password zips and paths that climb out. Checked live on the A55 and in the browser pane.
 - **Two panes** (`P2` code in `ui.html`, toolbar `#splitBtn`, ⌘\): a second phone folder. Drag between panes, ⌥ copies, Copy/Move buttons, right-click menu. Open state kept in localStorage `dv-split`. Checked live: copy, drag move, zip.
@@ -85,16 +85,16 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - If someone retries: route by device id `mtp:<serial>`, basic mode only (browse, save to Mac, add files, new folder, rename, delete with "deleted for good" confirm), hide shell features, match MTP to adb by serial, one long-lived MTP session behind a lock, bundle the binary with the LGPL text, fake MTP tool in `tests/fakebin`.
 
 ## Proposed, waiting for the user
-- **Mirror inside the app.** (The user chose to skip it for now.) A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
-- **Feature ideas not built yet:** none open. The user was offered the list on 2026-11-22 and everything except in-app mirroring was built.
+- **Feature gaps found by comparing with rivals (the user said: do them another time):** 1) restore for contacts and messages (export exists, import does not); 2) messages and notifications on the Mac; 3) away-from-Wi-Fi transfer; 4) Windows support; 5) no-USB-debugging mode (dropped, see above; only a phone companion app or a file-server app would work); 6) a Mac folder pane in the two-pane view; 7) mirror inside the app (A: dock the scrcpy window next to Cellar's, small; B: real in-app video, several days). Music playlists were dropped by the user. Suggested next big feature (v0.3.0): messages and notifications on the Mac, then restore.
 
 ## Still open
 1. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
-2. **Clean-Mac install** of the DMG: skipped by the user for now. Python is bundled now, so no Command Line Tools prompt is expected; untested on a clean Mac.
-3. **Not verified:** Open Anyway with the CI-built DMG itself (the local build was tested; same sources). The menu bar door icon wasn't visible in a screenshot (a menu bar organiser may hide it); the user hasn't confirmed it.
-4. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway; `make-dmg.sh` notes where signing goes.
-5. On the phone: Revoke USB debugging authorizations was used during the pairing test, so the next USB plug-in asks to allow the Mac again.
+2. **Clean-Mac install** of the DMG: skipped by the user. Python is bundled, so no Command Line Tools prompt is expected; untested on a clean Mac.
+3. **Not verified:** Open Anyway with the CI-built DMG (v0.2.3 was installed by copying from the mounted DMG, with no download quarantine flag). The menu bar drop was checked with a local build, not the release build.
+4. **Flaky test:** the `space` step ("biggest file is first", "file saved to the Mac first", "then moved to the phone Trash") failed in two CI runs and passed on re-run. Cause unknown: the first row on the Free up space page was not `report.pdf`. `tests/e2e.js` now prints the first five names on failure (`7f2118d`). Next time it fails, read the CI log for "saw:" and fix the cause.
+5. **Developer ID + notarization** ($99/yr, user's call) would remove Open Anyway; `make-dmg.sh` notes where signing goes.
 6. Impeccable skill update available (v4.8.0). Only on request.
+7. Two phones were on USB during this session (a Samsung A55 and a Redmi M2101K6G). The local test server picks the first adb device, so switch device in the UI when testing.
 
 ## Done 2026-11-06 (this session)
 - CI green for ba10e10; real Finder drag test passed (md5 match, Keep both); fresh wireless pairing works (VPN off). Drag-test files were moved to Cellar's Trash on the phone and the Mac Trash.
@@ -102,4 +102,4 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 
 ## Prompt to paste after /clear
 
-> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.2.0 is released as a DMG and the site is at hystericmoon.github.io/cellar. Read `NEXT_SESSION.md`, then `HANDOFF.md` and `README.md`. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
+> Context: Cellar is a local Android file manager for the Mac (`cellar.py` Python stdlib server on 127.0.0.1:8765 driving the phone through adb; `ui.html`; `mac/Cellar.swift` menu bar app). v0.2.3 is released as a DMG and the site is at hystericmoon.github.io/cellar. Read `NEXT_SESSION.md`, then `HANDOFF.md` and `README.md`. Do not run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac; CI runs them. Ask me what to work on next.
