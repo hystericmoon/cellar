@@ -2776,6 +2776,133 @@ def start_mirror(serial, opts):
 _seen_hw = set()
 
 
+# ---------------------------------------------------------------- phone notifications on the Mac
+
+NOTIF_APPS = {"com.whatsapp": "WhatsApp", "com.whatsapp.w4b": "WhatsApp Business", "org.telegram.messenger": "Telegram",
+              "com.google.android.apps.messaging": "Messages", "com.samsung.android.messaging": "Messages",
+              "com.instagram.android": "Instagram", "com.tokopedia.tkpd": "Tokopedia", "com.google.android.googlequicksearchbox": "Google",
+              "com.google.android.apps.maps": "Maps", "com.gojek.app": "Gojek", "com.grabtaxi.passenger": "Grab", "com.google.android.gm": "Gmail", "com.facebook.orca": "Messenger"}
+NOTIF_SKIP_PKGS = {"android", "com.android.systemui", "com.samsung.android.app.smartcapture"}
+NOTIF_LOCK = threading.Lock()
+NOTIF = {"seen": {}, "feed": {}, "viewed": 0.0}   # per serial: keys already known, newest-first feed; last time the page asked
+NOTIF_FEED_MAX = 100
+
+
+def notif_app_name(pkg):
+    if pkg in NOTIF_APPS:
+        return NOTIF_APPS[pkg]
+    last = pkg.split(".")[-1]
+    return last.replace("_", " ").capitalize() if last else pkg
+
+
+def _notif_value(v):
+    """`android.title=Hi`, or `String (Hi)` / `SpannableString (Hi)` for typed extras."""
+    v = v.strip()
+    m = re.fullmatch(r"\w*(?:String|CharSequence) \((.*)\)", v, re.S)
+    return (m.group(1) if m else v).strip()
+
+
+def parse_notifications(text):
+    """Turn `dumpsys notification --noredact` into a list of {key, pkg, app, title, text, when}.
+    Skips ongoing and group-summary entries, system packages and entries with no words."""
+    out = []
+    for block in re.split(r"(?m)^\s*NotificationRecord\(", text)[1:]:
+        pkg = re.search(r"\bpkg=([\w.]+)", block)
+        key = re.search(r"^\s+key=(\S+)", block, re.M)
+        if not pkg or not key or pkg.group(1) in NOTIF_SKIP_PKGS:
+            continue
+        flags = re.search(r"^\s+flags=(\S*)", block, re.M)
+        fl = flags.group(1) if flags else ""
+        if any(f in fl for f in ("ONGOING_EVENT", "FOREGROUND_SERVICE", "GROUP_SUMMARY", "NO_CLEAR")):
+            continue
+        extras = {}
+        cur = None
+        for line in block.splitlines():
+            m = re.match(r"^\s{8,}(android\.(?:title|text|bigText))=(.*)$", line)
+            if m:
+                cur = m.group(1)
+                extras[cur] = m.group(2)
+            elif cur and line.strip() not in ("", "}") and not re.match(r"^\s+[\w.]+=", line):
+                extras[cur] += "\n" + line.strip()   # a text that runs over several lines
+            else:
+                cur = None
+        title = _notif_value(extras.get("android.title", ""))
+        body = _notif_value(extras.get("android.bigText") or extras.get("android.text", ""))
+        if not (title or body) or title == "null" and body == "null":
+            continue
+        when = re.search(r"^\s+when=(\d+)", block, re.M)
+        out.append({"key": key.group(1), "pkg": pkg.group(1), "app": notif_app_name(pkg.group(1)),
+                    "title": "" if title == "null" else title[:200], "text": "" if body == "null" else body[:600],
+                    "when": int(when.group(1)) if when else 0})
+    return out
+
+
+def notif_poll(serial):
+    """Read the phone's notifications once. The first read only sets a baseline: it shows what is already
+    there but sends no Mac alert. Later reads alert once per new notification."""
+    out = sh(serial, "dumpsys notification --noredact", timeout=20)
+    items = parse_notifications(out)
+    fresh = []
+    with NOTIF_LOCK:
+        first = serial not in NOTIF["seen"]
+        seen = NOTIF["seen"].setdefault(serial, {})
+        feed = NOTIF["feed"].setdefault(serial, [])
+        now = int(time.time())
+        for it in items:
+            sig = (it["key"], it["when"], it["text"])
+            if seen.get(it["key"]) == sig:
+                continue
+            seen[it["key"]] = sig
+            feed.insert(0, {**it, "at": now, "baseline": first})
+            if not first:
+                fresh.append(it)
+        del feed[NOTIF_FEED_MAX:]
+        live = {it["key"] for it in items}
+        for k in [k for k in seen if k not in live]:
+            del seen[k]
+    for it in fresh:
+        notify(f"{it['app']}: {it['title']}" if it["title"] else it["app"], it["text"] or " ")
+    return len(fresh)
+
+
+def notif_wanted():
+    """Poll while the setting is on, or while the Notifications page is open."""
+    st = load_cfg().get("settings", {})
+    return bool(st.get("phone_alerts")) or time.time() - NOTIF["viewed"] < 20
+
+
+def notif_watcher():
+    while True:
+        time.sleep(4)
+        if not ADB or not notif_wanted():
+            continue
+        try:
+            for d in list_devices()["devices"]:
+                if d["state"] == "device":
+                    notif_poll(d["serial"])
+        except Exception:
+            pass
+
+
+def notif_feed(serial):
+    NOTIF["viewed"] = time.time()
+    with NOTIF_LOCK:
+        feed = list(NOTIF["feed"].get(serial, []))
+    st = load_cfg().get("settings", {})
+    return {"items": feed, "alerts": bool(st.get("phone_alerts")), "mac_alerts": st.get("notifications", True)}
+
+
+def notif_open(serial, pkg):
+    """Wake the phone and open an app on it (a reply is typed on the phone)."""
+    if not re.fullmatch(r"[\w.]+", pkg or ""):
+        raise AdbError("That app name isn't valid.")
+    sh(serial, "input keyevent KEYCODE_WAKEUP", timeout=10)
+    out = sh(serial, f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1 2>&1", timeout=15)
+    if "No activities found" in out or "monkey aborted" in out:
+        raise AdbError("The phone could not open that app.")
+    return {"ok": True}
+
+
 def device_watcher():
     while True:
         time.sleep(4)
@@ -3575,6 +3702,10 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             if not what:
                 raise AdbError("Choose what to export")
             self.send_json(run_exports(s, what))
+        elif R == ("GET", "/api/notifications"):
+            self.send_json(notif_feed(s))
+        elif R == ("POST", "/api/notifications/open"):
+            self.send_json(notif_open(s, arg("pkg")))
         elif R == ("GET", "/api/sms/check"):
             self.send_json(sms_check(s))
         elif R == ("GET", "/api/sms/threads"):
@@ -3677,10 +3808,11 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(start_mirror(s, self.body_json()))
         elif R == ("GET", "/api/settings"):
             st = load_cfg().get("settings", {})
-            self.send_json({"notifications": st.get("notifications", True), "finder_auto": st.get("finder_auto", False)})
+            self.send_json({"notifications": st.get("notifications", True), "finder_auto": st.get("finder_auto", False),
+                            "phone_alerts": st.get("phone_alerts", False)})
         elif R == ("POST", "/api/settings"):
             d = self.body_json()
-            clean = {k: bool(d[k]) for k in ("notifications", "finder_auto") if k in d}
+            clean = {k: bool(d[k]) for k in ("notifications", "finder_auto", "phone_alerts") if k in d}
             update_cfg(lambda c: c.setdefault("settings", {}).update(clean))
             self.send_json({"ok": True})
         elif R == ("GET", "/api/finder"):
@@ -3821,6 +3953,7 @@ def main():
     SERVER_PORT[0] = server.server_address[1]
     threading.Thread(target=unmount_dav, daemon=True).start()   # mounts left by a server that crashed
     threading.Thread(target=device_watcher, daemon=True).start()
+    threading.Thread(target=notif_watcher, daemon=True).start()
     threading.Thread(target=prune_cache, daemon=True).start()
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     print("\n  Cellar is running at " + url)

@@ -1,5 +1,6 @@
 ## What's new
 
+- **Phone notifications on the Mac:** new messages and alerts show as Mac notifications and in a feed. Off by default (Settings).
 - **Two panes:** open a second phone folder beside the first (⌘\). Drag between them, or use Copy and Move.
 - **Compress and Extract here:** zip files or folders, or open a .zip, from the right-click menu.
 - **Drop files on the menu bar icon** to send them to the phone's Download folder.

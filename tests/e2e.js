@@ -275,5 +275,16 @@ const ok = (c, m) => console.log((c ? 'PASS ' : 'FAIL ') + m);
     ok(fs.existsSync(MAC + '/phone.txt') && fs.existsSync(PH + '/mac.txt'), 'removing a pair leaves both folders alone');
     fs.rmSync(HM + '/SyncUi', {recursive:true, force:true}); fs.rmSync(PH, {recursive:true, force:true});
   });
+  await step('notifications', async () => {
+    await p.goto('http://127.0.0.1:8765/'); await p.waitForSelector('#library button[data-lib=notifications]');
+    await p.click('#library button[data-lib=notifications]'); await p.waitForSelector('#nfAlerts');
+    ok(!(await p.isChecked('#nfAlerts')), 'phone alerts start off');
+    await p.waitForSelector('#nfList li', {timeout:20000});
+    const txt = await p.textContent('#nfList');
+    ok(txt.includes('Ada Lovelace') && txt.includes('Lunch at noon?') && txt.includes('WhatsApp') && !txt.includes('Now playing') && !txt.includes('Charging'), 'notification feed lists messages, not ongoing ones');
+    ok(txt.includes('already on the phone'), 'first read is marked as already on the phone');
+    await p.click('[data-nfopen="com.whatsapp"]'); await p.waitForSelector('.toast:has-text("Opened on the phone")');
+    await p.screenshot({path:__dirname + '/shots/notifications.png', fullPage:true});
+  });
   console.log('errors:', errs); await b.close();
 })();

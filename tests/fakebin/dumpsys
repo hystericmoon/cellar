@@ -1,3 +1,58 @@
 #!/bin/sh
+if [ "$1" = "notification" ]; then
+cat <<'NOTES'
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x01: pkg=com.whatsapp user=UserHandle{0} id=1 tag=null importance=3 key=0|com.whatsapp|1|null|10001: Notification(channel=m))
+      key=0|com.whatsapp|1|null|10001
+      flags=0x0
+      notification=
+            when=1795000000000/1795000000000
+            extras={
+                android.title=Ada Lovelace
+                android.text=Lunch at noon?
+                android.bigText=Lunch at noon?
+Bring the notes.
+                android.template=String (android.app.Notification$BigTextStyle)
+            }
+    NotificationRecord(0x02: pkg=com.example.news user=UserHandle{0} id=2 tag=null importance=2 key=0|com.example.news|2|null|10002: Notification(channel=n))
+      key=0|com.example.news|2|null|10002
+      flags=ONLY_ALERT_ONCE
+      notification=
+            when=1795000100000/1795000100000
+            extras={
+                android.title=SpannableString (Headline of the day)
+                android.text=String (Short summary)
+            }
+    NotificationRecord(0x03: pkg=com.example.music user=UserHandle{0} id=3 tag=null importance=2 key=0|com.example.music|3|null|10003: Notification(channel=p))
+      key=0|com.example.music|3|null|10003
+      flags=ONGOING_EVENT
+      notification=
+            when=1795000200000/1795000200000
+            extras={
+                android.title=Now playing
+                android.text=Some song
+            }
+    NotificationRecord(0x04: pkg=com.example.chat user=UserHandle{0} id=4 tag=null importance=3 key=0|com.example.chat|4|null|10004: Notification(channel=g))
+      key=0|com.example.chat|4|null|10004
+      flags=GROUP_SUMMARY
+      notification=
+            when=1795000300000/1795000300000
+            extras={
+                android.title=3 new messages
+                android.text=From friends
+            }
+    NotificationRecord(0x05: pkg=com.android.systemui user=UserHandle{-1} id=5 tag=charging_state importance=1 key=-1|com.android.systemui|5|charging_state|10058: Notification(channel=CHR))
+      key=-1|com.android.systemui|5|charging_state|10058
+      flags=ONGOING_EVENT
+      notification=
+            when=1795000400000/1795000400000
+            extras={
+                android.title=Charging
+                android.text=76%
+            }
+NOTES
+exit 0
+fi
 echo "Current Battery Service state:"
 echo "  level: 76"

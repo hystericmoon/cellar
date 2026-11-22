@@ -1,0 +1,6 @@
+#!/bin/sh
+echo "monkey $*" >> "$(dirname "$0")/calls.log"
+case "$*" in
+  *com.nonexistent*) echo "** No activities found to run, monkey aborted." ;;
+  *) echo "Events injected: 1" ;;
+esac

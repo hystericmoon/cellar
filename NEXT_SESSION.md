@@ -13,10 +13,16 @@ Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the
   `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
 - Two phones may be on USB (Samsung A55, Redmi M2101K6G). The test server picks the first adb device: switch device in the UI.
 
+## Phone notifications (built 2026-11-22, in v0.3.0 work, not released)
+- `cellar.py`: `parse_notifications` reads `dumpsys notification --noredact` (title, text, bigText; skips ongoing, group summary, system). `notif_poll` keeps the first read as a baseline (no Mac alert) and alerts once per new notification through `notify()`. `notif_watcher` polls every 4 s only while Settings `phone_alerts` is on or the Notifications page was read in the last 20 s. Routes: `GET /api/notifications`, `POST /api/notifications/open?pkg=` (wakes the phone, `monkey` launches the app). Setting `phone_alerts` is off by default (privacy) and needs `notifications` on.
+- `ui.html`: `#:notifications` page in the Phone group, toggle in Settings.
+- Checked live on the A55 (Android 17): notification title and text come through; the parser read 4 real items. Not checked live: a Mac alert for a new notification, a chat-app (WhatsApp) message, Open on phone.
+- Text messages are NOT covered: Google Messages is the default app and keeps newer chats (RCS) outside `content://sms` (newest row there is 3 Nov). Reply is not built: adb cannot send a text reliably; Open on phone is the fallback. Possible next step: `am start -a android.intent.action.SENDTO -d smsto:NUMBER --es sms_body TEXT` opens a pre-filled draft.
+- Tests added (`tests/fakebin/dumpsys`, `monkey`; API and browser). Not run locally; watch CI.
+
 ## Next work (the user said: another time)
-Suggested v0.3.0: messages and notifications on the Mac, then restore.
 1. Restore for contacts and messages (export exists, import does not).
-2. Messages and notifications on the Mac.
+2. A text message view or reply from the Mac (see above).
 3. Away-from-Wi-Fi transfer.
 4. Windows support.
 5. A Mac folder pane in the two-pane view (the second pane is phone-only).

@@ -434,6 +434,7 @@ dialog.small{width:min(520px,94vw)}
 .dpname{flex:1;min-width:0;display:grid}.dpname b{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dpname small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dpwhy{font-size:12.5px;color:var(--muted);min-width:90px;text-align:right}.dupe input:checked~.dpwhy{color:var(--ok);font-weight:600}
 .group legend{font-weight:600;padding:0 6px}.group input[type=radio]{accent-color:var(--accent);width:16px;height:16px}
+.nflist{list-style:none;margin:0;padding:0;display:grid;gap:8px}.nflist li{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);min-width:0}.nflist .app{font-size:12px;color:var(--muted)}.nflist b{font-weight:560;overflow-wrap:anywhere}.nflist p{margin:0;color:var(--muted);font-size:13px;overflow-wrap:anywhere;white-space:pre-line}.nflist .go{grid-row:1 / span 3;grid-column:2;align-self:center}.nflist .old{opacity:.7}
 .exlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}.exlist li{display:grid;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius)}.exlist span{color:var(--muted);font-size:13px}.exlist .bad{border-color:var(--danger)}.exlist .bad span{color:var(--danger)}
 .smlist{list-style:none;margin:0;padding:0;max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius)}.smlist li{border-bottom:1px solid var(--line)}.smlist li:last-child{border:0}.smlist label{display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer}.smlist label:hover{background:var(--hover)}.smlist input{accent-color:var(--accent);width:16px;height:16px}
 .toggle input[type=radio]{accent-color:var(--accent)}
@@ -799,16 +800,17 @@ const ep = e => e.path || join(S.listPath, e.name);
 const parentOf = p => p.replace(/\/[^/]+$/, "") || "/";
 const baseName = p => p.split("/").pop();
 const placeLabel = p => (p === HOME || VOLS.some(v => v.path === p)) ? rootLabel(p) : baseName(p) || "/";
-const LIB = [["home","Home","house"],["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["sync","Sync folders","sync"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"],["settings","Settings","gear"]];
+const LIB = [["home","Home","house"],["recent","Recent","clock"],["space","What’s taking space","chart"],["dupes","Duplicates","copy"],["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["notifications","Notifications","bell"],["extras","Phone controls","phone"],["sync","Sync folders","sync"],["backup","Photo backup","camera"],["apps","Apps","apk"],["trash","Trash","trash"],["settings","Settings","gear"]];
 // Sidebar groups below Favorites. [view, label, icon, hue]; Free up space also covers Duplicates.
 const NAV_GROUPS = [["tools", "Tools", [["space","Free up space","chart","k-teal"],["backup","Photo backup","camera","k-violet"],["sync","Sync folders","sync","k-sky"]]],
-  ["phone", "Phone", [["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["extras","Phone controls","phone"],["apps","Apps","apk"]]]];
+  ["phone", "Phone", [["export","Contacts & calendar","contact"],["messages","Text messages","chat"],["notifications","Notifications","bell"],["extras","Phone controls","phone"],["apps","Apps","apk"]]]];
 const NAV_BOTTOM = [["trash","Trash","trash"],["settings","Settings","gear"]];
 const PAGES = {};   // page-style views (not file lists): name -> async render(token)
 const isPage = () => !!PAGES[S.mode];
 I.copy = '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>';
 I.check = '<path d="m5 12 5 5 9-10"/>';
 I.contact = '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>';
+I.bell = '<path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7z"/><path d="M10 20a2 2 0 0 0 4 0"/>';
 I.chat = '<path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z"/>';
 I.sync = '<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>';
 I.chart = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
@@ -2058,6 +2060,30 @@ async function renderExport() {
 }
 PAGES.export = renderExport;
 
+/* ---------- phone notifications ---------- */
+let NF_TIMER = 0;
+async function renderNotifications(token) {
+  clearInterval(NF_TIMER);
+  const draw = r => {
+    const box = $("#nfList"); if (!box) return;
+    box.innerHTML = r.items.length ? `<ul class="nflist">${r.items.map((n, i) => `<li class="${n.baseline ? "old" : ""}"><span class="app">${esc(n.app)} · ${esc(fmtDate(n.at))}${n.baseline ? " · was already on the phone" : ""}</span>
+      <button class="btn go" type="button" data-nfopen="${esc(n.pkg)}">Open on phone</button>
+      ${n.title ? `<b>${esc(n.title)}</b>` : ""}${n.text ? `<p>${esc(n.text)}</p>` : ""}</li>`).join("")}</ul>`
+      : `<p class="muted">Nothing yet. New notifications from the phone appear here while this page is open.</p>`;
+  };
+  const load = async () => { try { const r = await api("/api/notifications"); if (S.mode === "notifications") { draw(r); const t = $("#nfAlerts"); if (t && document.activeElement !== t) t.checked = r.alerts; } } catch(e) {} };
+  $("#content").innerHTML = `<div class="page"><h1>Phone notifications</h1>
+    <p class="lead">Messages and alerts from the phone show here and as Mac notifications. Text stays on this Mac. To reply, tap Open on phone and type on the phone.</p>
+    <section class="panel"><label class="toggle"><input type="checkbox" id="nfAlerts"><span><b>Show phone notifications on the Mac</b><small>Keeps working in the background while Cellar runs. Off by default, because message text will appear on your Mac screen.</small></span></label></section>
+    <section class="panel" aria-labelledby="nfH"><h2 id="nfH">Latest</h2><div id="nfList" aria-live="polite"><p class="muted">Looking at the phone…</p></div></section></div>`;
+  $("#nfAlerts").onchange = e => postJSON("/api/settings", {phone_alerts: e.target.checked}).catch(err => toast(err.message, {err:true}));
+  $("#nfList").onclick = async e => { const b = e.target.closest("[data-nfopen]"); if (!b) return;
+    try { await api("/api/notifications/open", {pkg: b.dataset.nfopen}, {method:"POST"}); toast("Opened on the phone."); } catch(err) { toast(err.message, {err:true}); } };
+  await load();
+  NF_TIMER = setInterval(() => { if (S.mode !== "notifications") return clearInterval(NF_TIMER); if (!document.hidden) load(); }, 5000);
+}
+PAGES.notifications = renderNotifications;
+
 /* ---------- Save text messages ---------- */
 async function renderMessages(token) {
   const chk = await api("/api/sms/check"); if (S.loadToken !== token) return;
@@ -2284,7 +2310,8 @@ async function renderSettings(token) {
     <div class="cols2"><div>
       <section class="panel" aria-labelledby="stPhone"><h2 id="stPhone">Phone</h2>
         ${tog("stFinder", "Show the phone in Finder when it connects", "It appears under Locations, so Finder’s own copy, paste and drag work.", s.finder_auto)}
-        ${tog("stNotify", "Notifications", "Tell me when long transfers and backups finish.", s.notifications)}</section>
+        ${tog("stNotify", "Notifications", "Tell me when long transfers and backups finish.", s.notifications)}
+        ${tog("stPhoneAlerts", "Show phone notifications on the Mac", "Messages and alerts from the phone appear as Mac notifications. Needs Notifications above.", s.phone_alerts)}</section>
       <section class="panel" aria-labelledby="stFiles"><h2 id="stFiles">Saved files</h2><div class="pathbox"><code>~/Downloads/Cellar</code><button class="btn" type="button" id="revealBtn">Show in Finder</button></div></section>
     </div><div>
       <section class="panel" aria-labelledby="stKeys"><h2 id="stKeys">Shortcuts</h2><ul class="legend" style="grid-template-columns:1fr">${[["⌘C · ⌘X · ⌘V","Copy, cut, paste"],["⌥⌘V","Move here"],["⌘⌫","Move to Trash"],["⌘Z","Undo"],["F2","Rename"],["⌘D","Duplicate"],["⌥⌘N","New folder"],["Space","Preview"],["⌘F","Search the phone"]].map(([k, l]) => `<li><span>${l}</span><b>${k}</b></li>`).join("")}</ul></section>
@@ -2294,7 +2321,7 @@ async function renderSettings(token) {
   $("#stGlass").onchange = e => { store.set("glass", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
   $("#stMatch").onchange = e => { store.set("matchos", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
   $("#stKind").onchange = e => { store.set("kind", e.target.checked ? "1" : "0"); APPEARANCE.apply(); };
-  ["stFinder", "stNotify"].forEach(id => $("#" + id).onchange = () => postJSON("/api/settings", {finder_auto: $("#stFinder").checked, notifications: $("#stNotify").checked}).catch(e => toast(e.message, {err:true})));
+  ["stFinder", "stNotify", "stPhoneAlerts"].forEach(id => $("#" + id).onchange = () => postJSON("/api/settings", {finder_auto: $("#stFinder").checked, notifications: $("#stNotify").checked, phone_alerts: $("#stPhoneAlerts").checked}).catch(e => toast(e.message, {err:true})));
   $("#revealBtn").onclick = () => api("/api/reveal", {}, {method:"POST"});
 }
 PAGES.settings = renderSettings;

@@ -292,5 +292,19 @@ import tempfile; dtmp=tempfile.mkdtemp(); open(dtmp+"/dropped.txt","w").write("d
 ok(j["state"]=="done" and open(H+"/Download/dropped.txt").read()=="dropped", "file dropped on the menu bar icon reaches the phone's Download folder")
 r=call("/api/dropfiles","POST",{"paths":[dtmp+"/missing.txt"]}); ok(r.get("HTTP")==502, "drop of unreadable files refused")
 os.remove(H+"/Download/dropped.txt"); shutil.rmtree(dtmp)
+# --- phone notifications on the Mac (read from dumpsys; first read is a baseline, ongoing and summary entries are skipped)
+import time as _t
+r=call("/api/notifications"); ok("items" in r and r["alerts"] is False, "notifications feed answers (alerts off by default)")
+for _ in range(20):
+    _t.sleep(1); r=call("/api/notifications")
+    if r["items"]: break
+nt={n["title"]:n for n in r["items"]}
+ok(set(nt)=={"Ada Lovelace","Headline of the day"}, f"notifications: only real messages listed {sorted(nt)}")
+ok(nt["Ada Lovelace"]["app"]=="WhatsApp" and nt["Ada Lovelace"]["text"]=="Lunch at noon?\nBring the notes." and nt["Ada Lovelace"]["baseline"] is True, "notification: app name, multi-line text, marked as already on the phone")
+ok(nt["Headline of the day"]["text"]=="Short summary", "notification: typed values unwrapped")
+r=call("/api/notifications/open","POST",pkg="com.whatsapp"); ok(r.get("ok") and "monkey -p com.whatsapp" in open(LOG).read(), "Open on phone launches the app")
+r=call("/api/notifications/open","POST",pkg="com.nonexistent.app"); ok(r.get("HTTP")==502, f"Open on phone says when the app can't open {r}")
+r=call("/api/notifications/open","POST",pkg="a b;rm"); ok(r.get("HTTP")==502, "Open on phone refuses odd app names")
+call("/api/settings","POST",{"phone_alerts":True}); ok(call("/api/settings")["phone_alerts"] is True, "phone alert setting saved"); call("/api/settings","POST",{"phone_alerts":False})
 # --- Geist ships with the app and is inlined, so the look works offline
 page=urllib.request.urlopen(B+"/").read().decode(); ok("@font-face{font-family:Geist;src:url(data:font/woff2;base64," in page and "__GEIST__" not in page, "Geist font is bundled into the page")

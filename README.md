@@ -71,6 +71,7 @@ Everything runs on your Mac (127.0.0.1). Nothing goes to the internet.
 - Phone camera as a webcam on the Mac (Android 12+, scrcpy 2.2+), from the mirror dialog. The picture stays upright when you turn the phone, front or back.
 - Take a photo with the phone from the Mac (Phone controls). It saves to `~/Downloads/Cellar/Photos`. The phone must be unlocked.
 - Video thumbnails in the grid (videos under 400 MB; made once and kept).
+- Phone notifications on the Mac: messages and alerts from any app, in a feed and as Mac notifications (Settings, off by default). Reply by tapping Open on phone. Cellar reads them over adb, so nothing leaves your Mac.
 - Drop files on the menu bar icon to send them to the phone's Download folder.
 - Share the clipboard: copy on the Mac, paste on the phone, and the other way round (Phone controls, needs scrcpy).
 - Phone controls: ring my phone, music and volume keys, Do Not Disturb. Also in the menu bar. Not every phone supports every one.
