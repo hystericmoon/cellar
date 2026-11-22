@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
             drop.button = button
             drop.onDrop = { [weak self] urls in self?.sendDropped(urls) }
             button.addSubview(drop)
+            dbg("overlay frame=\(NSStringFromRect(drop.frame)) button=\(NSStringFromRect(button.frame)) window=\(String(describing: button.window))")
         }
         requestLocalNetwork()
         startServer()
@@ -537,6 +538,12 @@ app.run()
 
 /// Holds a full-size background view (the window's glass) with the page and the drag strip on top of it.
 /// Transparent layer over the menu bar icon. It accepts dropped files and passes clicks on to the icon.
+func dbg(_ m: String) {
+    let line = "\(Date()) \(m)\n"
+    if let h = FileHandle(forWritingAtPath: "/tmp/cellar-drop.log") { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); h.closeFile() }
+    else { try? line.write(toFile: "/tmp/cellar-drop.log", atomically: true, encoding: .utf8) }
+}
+
 final class MenuDropView: NSView {
     var onDrop: (([URL]) -> Void)?
     weak var button: NSStatusBarButton?
@@ -547,10 +554,13 @@ final class MenuDropView: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    override func mouseDown(with event: NSEvent) { button?.performClick(nil) }
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func mouseDown(with event: NSEvent) { dbg("click"); button?.performClick(nil) }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dbg("entered"); return .copy }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { dbg("prepare"); return true }
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        dbg("perform urls=\(urls.count)")
         guard !urls.isEmpty else { return false }
         onDrop?(urls)
         return true
