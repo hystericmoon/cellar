@@ -1,12 +1,12 @@
 # Cellar: next session
 
-Updated 2026-11-06 (evening). Work happens on `main` (latest pushed: brand, site, DMG, Unsplash photos). Working tree clean.
+Updated 2026-11-22. Work happens on `main` (latest pushed: `22c6668` fixed sidebar/toolbar, battery refresh, type filter, upright camera). Working tree clean except the untracked `linkedin/` folder (a LinkedIn image; keep it out of commits).
 
 ## State
 - **Released:** Cellar **0.2.0** at https://github.com/hystericmoon/cellar/releases/tag/v0.2.0: `Cellar.dmg` (universal, ad-hoc signed, not notarized) + `Cellar.dmg.sha256`, built by `.github/workflows/release.yml`. First open needs System Settings › Privacy & Security › Open Anyway (in README, site, release notes, and printed in the DMG window). v0.1.0 (arm64 zip) is older.
 - **Site live:** https://hystericmoon.github.io/cellar/ (GitHub Pages from `main` `/docs`; also the repo homepage). Download button links `releases/latest/download/Cellar.dmg`, so future tags update it automatically.
-- **CI:** tests green on main (API 135, Browser 74 at the last full run). The release workflow is green for v0.2.0.
-- **Installed app:** `/Applications/Cellar.app` is 0.2.0 from a Safari-flagged copy of the DMG (tested Open Anyway: opened fine). The previous build is in the Mac Trash.
+- **CI:** tests green on main (API 136, Browser 81 for `22c6668`). The release workflow is green for v0.2.0.
+- **Installed app:** `/Applications/Cellar.app` is a local build of `22c6668` (built 2026-11-22 with `NO_INSTALL=1 mac/build-app.sh`, old copy in the Mac Trash). Not released yet: the next tag (v0.2.1) would ship it.
 - **To release:** `git tag -a v0.2.1 -m ... && git push origin v0.2.1`. Locally: `mac/make-dmg.sh <version>` (needs `pip3 install dmgbuild`).
 - Never run `tests/setup_fake_phone.py`, `tests/reset.py` or `tests/run_all.sh` on this Mac (they write to `/storage` and delete `~/Downloads/Cellar`). CI runs them.
 
@@ -49,6 +49,20 @@ Built from the mockup at https://claude.ai/artifact/XTKLCvXyfrA1j6qbxezCnr, in `
 - Site: `docs/index.html` (GitHub Pages from `/docs`), door colour picker, install steps with Open Anyway.
 - DMG: `mac/make-dmg.sh <version>` builds a universal app and a branded DMG with dmgbuild (create-dmg's Finder scripting didn't save the layout on macOS 26). `.github/workflows/release.yml` does it on a `v*` tag and uploads `Cellar.dmg`. Unsigned: first open needs Open Anyway. Tested 0.2.0 from a Safari-flagged copy: opened fine after Open Anyway.
 - A clean Mac without Command Line Tools will be asked to install them (the app runs /usr/bin/python3). Bundling Python would remove this.
+
+## Done 2026-11-22
+- **Only the file list scrolls:** `.app` has `grid-template-rows:minmax(0,1fr)`, `aside,main{min-height:0}`, `html,body{overflow:hidden}`, and `.sr` has `top:0;left:0` (the hidden `#announce` pushed the page 1px). Checked on Home, Settings, Free up space, Apps, Backup, Recent, Trash, Camera, and in `/?app=1`.
+- **Battery:** the page read `/api/info` only when a phone connected. `refreshInfo()` now runs every 30 s (skipped while hidden) and on `visibilitychange`; it redraws only when battery or free space changed, keeps focus, and updates `#hmSub` on Home. The menu bar app already polled every 4 s.
+- **Type filter:** funnel button `#kindBtn` next to Search opens a menu (All kinds, Folders, Images, Videos, Audio, Documents = text+pdf, Archives, Apps, Other) with counts; empty kinds are disabled. `S.kind` filters `visible()`, so select all takes only what's shown; hidden selected items are dropped. It clears when you open another folder or view. Empty state offers "Show all kinds".
+- **Camera upright:** scrcpy sends the sensor picture sideways (this phone: back 90°, front 270°). `build_mirror_cmd` adds `--orientation=90` (back) / `270` (front). Checked: the back camera recording is now portrait. Not checked: the front camera, and ⌥←/⌥→ to turn it in the window.
+- LinkedIn post drafted (text in chat only) and `linkedin/site-tall.png` made from the site. The site says "open source" but the repo has no LICENSE.
+- Testing UI changes on this Mac without the test scripts: run a second server with the watcher off, then open it in the browser pane:
+  `CELLAR_PORT=8790 CELLAR_NO_BROWSER=1 python3 -I -c "import sys; sys.path.insert(0,'.'); import cellar; cellar.device_watcher=lambda:None; cellar.main()"`
+  (the watcher would run on-connect actions such as auto backup and Finder mount). Don't change settings there: it shares `~/.cellar.json`.
+
+## Proposed, waiting for the user
+- **Mirror inside the app.** A) dock the scrcpy window next to Cellar's window with `--window-x/-y/-width/-height` (small; recommended). B) real in-app video: scrcpy-server stream, WebCodecs, input (several days). The user hasn't chosen.
+- **Feature ideas given:** video thumbnails (videos show only an icon), bundle Python, shared clipboard, drop files on the menu bar icon, add a LICENSE.
 
 ## Still open
 1. **GitHub support ticket** (checked 2026-11-06: not purged yet) asking to purge old commits `ae162fa`, `5a6acde`, `f6b8181`. When the reply comes, `https://github.com/hystericmoon/cellar/commit/ae162fa` should show "not found".
