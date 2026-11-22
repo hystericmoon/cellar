@@ -9,6 +9,7 @@ Nothing leaves your machine; the server listens on 127.0.0.1 only.
 """
 import datetime
 import json
+import math
 import mimetypes
 import os
 import posixpath
@@ -2363,9 +2364,15 @@ def build_mirror_cmd(exe, serial, opts, info, version):
         cmd += ["--video-source=camera", f"--camera-facing={facing}", "--no-control", "--window-title", f"{name} camera ({facing})"]
         # scrcpy sends the camera picture as the sensor sees it, and phone sensors sit sideways (back 90°, front 270°),
         # so an upright phone showed a picture turned to the left. Turn it upright; ⌥← / ⌥→ in the window turn it further.
-        turn = {"back": 90, "front": 270}.get(facing)
-        if turn:
-            cmd.append(f"--orientation={turn}")
+        # The picture is fixed to the phone, so when the phone is turned the picture must be turned back by the same amount.
+        # tilt = how far the phone is turned counter-clockwise (0, 90, 180, 270), read from its motion sensor.
+        base = {"back": 90, "front": 270}.get(facing)
+        if base is not None:
+            # Android's own rule: the back camera turns against the phone, the front camera (a mirror image) turns with it.
+            sign = 1 if facing == "front" else -1
+            cmd.append(f"--orientation={(base + sign * int(opts.get('tilt') or 0)) % 360}")
+        if opts.get("place"):
+            cmd += [f"--window-x={opts['place'][0]}", f"--window-y={opts['place'][1]}"]
         if opts.get("mic"):
             cmd.append("--audio-source=mic")
         else:
@@ -2387,6 +2394,145 @@ def build_mirror_cmd(exe, serial, opts, info, version):
     return cmd
 
 
+def tilt_from_gravity(x, y, z):
+    """How far the phone is turned counter-clockwise, from the gravity reading. None when it lies flat or is unclear."""
+    if math.hypot(x, y) < 5.5 or abs(z) > 8:
+        return None
+    ang = math.degrees(math.atan2(x, y)) % 360     # portrait: gravity on +y → 0; top to the left: gravity on +x → 90
+    return int(((ang + 45) % 360) // 90) * 90
+
+
+def phone_tilt(serial):
+    """Current tilt of the phone (0/90/180/270), or None."""
+    return read_tilt(serial)[0]
+
+
+def read_tilt(serial):
+    """(tilt, stamp) from the newest accelerometer samples in dumpsys. stamp is the time of the newest sample:
+    when it stops changing, the phone's screen is off and the sensor is asleep."""
+    try:
+        out = sh(serial, "dumpsys sensorservice", timeout=8)
+    except Exception:
+        return None, None
+    block, name = [], None
+    for line in out.splitlines():
+        m = re.match(r"^(.+?): last \d+ events", line)
+        if m:
+            name = m.group(1)
+            block = []
+            continue
+        if name and re.search(r"Accelerometer$", name) and "Uncalibrated" not in name and "Linear" not in name:
+            m = re.match(r"\s+\d+ \(ts=([\d.]+), wall=[^)]*\)\s+(-?[\d.]+), (-?[\d.]+), (-?[\d.]+)", line)
+            if m:
+                block.append(tuple(float(v) for v in m.groups()))
+        elif name and not line.startswith("\t"):
+            name = None
+    last = block[-4:]
+    if not last:
+        return None, None
+    n = len(last)
+    return tilt_from_gravity(sum(v[1] for v in last) / n, sum(v[2] for v in last) / n, sum(v[3] for v in last) / n), last[-1][0]
+
+
+_JXA_BOUNDS = ('ObjC.import("CoreGraphics");ObjC.import("Foundation");'
+               'var l=ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1,0)));'
+               'JSON.stringify(l.filter(function(w){return w.kCGWindowOwnerPID==%d}).map(function(w){return w.kCGWindowBounds}))')
+
+
+def _jxa(code):
+    try:
+        r = subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", code], capture_output=True, text=True, timeout=5)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
+def _window_box(pid):
+    """(x, y, width, height) of the window of this process on the Mac screen, or None. macOS only, no permission needed."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        boxes = json.loads(_jxa(_JXA_BOUNDS % pid) or "[]")
+        b = max(boxes, key=lambda w: w["Width"] * w["Height"])
+        return b["X"], b["Y"], b["Width"], b["Height"]
+    except Exception:
+        return None
+
+
+def _bring_front(pid):
+    # Asking System Events works where NSRunningApplication.activate does not (macOS 14+ ignores it from a background process).
+    if sys.platform == "darwin":
+        try:
+            subprocess.run(["/usr/bin/osascript", "-e",
+                            f'tell application "System Events" to set frontmost of (first process whose unix id is {int(pid)}) to true'],
+                           capture_output=True, timeout=5)
+        except Exception:
+            pass
+
+
+def _front_when_shown(proc):
+    for _ in range(40):
+        time.sleep(0.15)
+        if proc.poll() is not None:
+            return
+        if _window_box(proc.pid):
+            _bring_front(proc.pid)
+            return
+
+
+def _watch_tilt(serial, opts, exe, env, version):
+    """While the camera window is open, restart it when the phone is turned, so the picture stays upright."""
+    cur = int(opts.get("tilt") or 0)
+    pending = None
+    last_stamp, woke = None, 0.0
+    while True:
+        time.sleep(0.2)
+        proc = MIRRORS.get(serial)
+        if proc is None or proc.poll() is not None or MIRRORS.get(serial) is not proc or opts.get("_stop"):
+            return
+        t, stamp = read_tilt(serial)
+        if stamp is not None and stamp == last_stamp:
+            if time.time() - woke > 4:      # screen is off, so the sensor sleeps: wake the phone's screen
+                woke = time.time()
+                try:
+                    sh(serial, "input keyevent KEYCODE_WAKEUP", timeout=5)
+                except Exception:
+                    pass
+        last_stamp = stamp
+        if t is None or t == cur:
+            pending = None
+            continue
+        if pending != t:           # must read the same turn twice in a row
+            pending = t
+            continue
+        prev, cur = cur, t
+        pending = None
+        box = _window_box(proc.pid)
+        proc.terminate()
+        try:
+            proc.wait(3)
+        except Exception:
+            proc.kill()
+        o = dict(opts, tilt=cur)
+        if box:   # reopen around the same centre, so the window turns in place instead of jumping
+            x, y, w, h = box
+            nw, nh = (h, w) if (cur - prev) % 180 else (w, h)    # a quarter turn swaps width and height
+            o["place"] = (max(0, int(x + (w - nw) / 2)), max(0, int(y + (h - nh) / 2)))
+        try:
+            cmd = build_mirror_cmd(exe, serial, o, device_info(serial), version)
+        except AdbError:
+            return
+        new = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        MIRRORS[serial] = new
+        for _ in range(40):        # bring the new window to the front once it exists
+            time.sleep(0.15)
+            if new.poll() is not None:
+                break
+            if _window_box(new.pid):
+                _bring_front(new.pid)
+                break
+
+
 def start_mirror(serial, opts):
     exe = find_scrcpy()
     if not exe:
@@ -2395,8 +2541,14 @@ def start_mirror(serial, opts):
     if old and old.poll() is None:
         return {"running": True}
     env = dict(os.environ, ADB=ADB or "adb")
-    cmd = build_mirror_cmd(exe, serial, opts, device_info(serial), scrcpy_version(exe))
+    version = scrcpy_version(exe)
+    if opts.get("source") == "camera" and "tilt" not in opts:
+        opts = dict(opts, tilt=phone_tilt(serial) or 0)
+    cmd = build_mirror_cmd(exe, serial, opts, device_info(serial), version)
     MIRRORS[serial] = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if opts.get("source") == "camera":
+        threading.Thread(target=_watch_tilt, args=(serial, opts, exe, env, version), daemon=True).start()
+        threading.Thread(target=_front_when_shown, args=(MIRRORS[serial],), daemon=True).start()
     return {"running": True}
 
 

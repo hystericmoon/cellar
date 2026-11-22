@@ -59,7 +59,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
-  <key>NSAppleEventsUsageDescription</key><string>Cellar asks Finder to show your phone under Locations.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Cellar asks Finder to show your phone under Locations, and brings the camera window to the front when you turn your phone.</string>
   <key>NSLocalNetworkUsageDescription</key><string>Cellar connects to your Android phone over Wi-Fi, so you can use it without a cable.</string>
   <key>NSBonjourServices</key><array><string>_adb-tls-connect._tcp</string><string>_adb-tls-pairing._tcp</string><string>_adb._tcp</string></array>
 </dict></plist>
