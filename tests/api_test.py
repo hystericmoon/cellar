@@ -306,5 +306,15 @@ r=call("/api/notifications/open","POST",pkg="com.whatsapp"); ok(r.get("ok") and 
 r=call("/api/notifications/open","POST",pkg="com.nonexistent.app"); ok(r.get("HTTP")==502, f"Open on phone says when the app can't open {r}")
 r=call("/api/notifications/open","POST",pkg="a b;rm"); ok(r.get("HTTP")==502, "Open on phone refuses odd app names")
 call("/api/settings","POST",{"phone_alerts":True}); ok(call("/api/settings")["phone_alerts"] is True, "phone alert setting saved"); call("/api/settings","POST",{"phone_alerts":False})
+# --- phone alerts: baseline silent, no alert while the setting is off, failed reads ignored, one phone on two cables alerts once
+_H="Current Notification Manager state:\n  Notification List:\n"
+_rec=lambda k: f"    NotificationRecord(0x1: pkg=com.whatsapp user=U id=1)\n      key={k}\n      flags=0x0\n      notification=\n            when=1\n            extras={{\n                android.title=T{k}\n                android.text=hi\n            }}\n"
+_st={"out":_H+_rec("k1")}; _al=[]; _cfg={"phone_alerts":False}
+cm.sh=lambda s,cmd,timeout=0: _st["out"]; cm.notify=lambda t,m: _al.append(t); cm.load_cfg=lambda: {"settings":_cfg}; cm.hw_id=lambda s: "PHONE"
+cm.notif_poll("usb"); ok(not _al, "phone alerts: first read is silent")
+_st["out"]=_H+_rec("k1")+_rec("k2"); cm.notif_poll("usb"); ok(not _al, "phone alerts: nothing alerts while the setting is off")
+_cfg["phone_alerts"]=True; _st["out"]=_H+_rec("k1")+_rec("k2")+_rec("k3"); cm.notif_poll("usb"); ok(len(_al)==1, "phone alerts: a new notification alerts once when on")
+_st["out"]=""; cm.notif_poll("usb"); _st["out"]=_H+_rec("k1")+_rec("k2")+_rec("k3"); cm.notif_poll("usb"); ok(len(_al)==1, "phone alerts: a failed read does not replay old notifications")
+_st["out"]=_H+_rec("k1")+_rec("k2")+_rec("k3")+_rec("k4"); cm.notif_poll("usb"); cm.notif_poll("wifi"); ok(len(_al)==2, "phone alerts: one phone on USB and Wi-Fi alerts once")
 # --- Geist ships with the app and is inlined, so the look works offline
 page=urllib.request.urlopen(B+"/").read().decode(); ok("@font-face{font-family:Geist;src:url(data:font/woff2;base64," in page and "__GEIST__" not in page, "Geist font is bundled into the page")

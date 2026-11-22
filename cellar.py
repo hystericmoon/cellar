@@ -2841,12 +2841,15 @@ def notif_poll(serial):
     """Read the phone's notifications once. The first read only sets a baseline: it shows what is already
     there but sends no Mac alert. Later reads alert once per new notification."""
     out = sh(serial, "dumpsys notification --noredact", timeout=20)
+    if "Notification Manager state" not in out:
+        return 0   # a failed read must not look like "everything was dismissed"
     items = parse_notifications(out)
     fresh = []
+    hw = notif_hw(serial)
     with NOTIF_LOCK:
-        first = serial not in NOTIF["seen"]
-        seen = NOTIF["seen"].setdefault(serial, {})
-        feed = NOTIF["feed"].setdefault(serial, [])
+        first = hw not in NOTIF["seen"]
+        seen = NOTIF["seen"].setdefault(hw, {})
+        feed = NOTIF["feed"].setdefault(hw, [])
         now = int(time.time())
         for it in items:
             sig = (it["key"], it["when"], it["text"])
@@ -2860,9 +2863,17 @@ def notif_poll(serial):
         live = {it["key"] for it in items}
         for k in [k for k in seen if k not in live]:
             del seen[k]
-    for it in fresh:
-        notify(f"{it['app']}: {it['title']}" if it["title"] else it["app"], it["text"] or " ")
+    if load_cfg().get("settings", {}).get("phone_alerts"):
+        for it in fresh:
+            notify(f"{it['app']}: {it['title']}" if it["title"] else it["app"], it["text"] or " ")
     return len(fresh)
+
+
+def notif_hw(serial):
+    try:
+        return hw_id(serial)
+    except Exception:
+        return serial
 
 
 def notif_wanted():
@@ -2877,9 +2888,17 @@ def notif_watcher():
         if not ADB or not notif_wanted():
             continue
         try:
+            done = set()
             for d in list_devices()["devices"]:
-                if d["state"] == "device":
+                if d["state"] != "device":
+                    continue
+                hw = notif_hw(d["serial"])
+                if hw not in done:   # one phone on USB and Wi-Fi is read once
+                    done.add(hw)
                     notif_poll(d["serial"])
+            with NOTIF_LOCK:   # a phone that went away starts with a fresh baseline when it returns
+                for k in [k for k in NOTIF["seen"] if k not in done]:
+                    NOTIF["seen"].pop(k, None)
         except Exception:
             pass
 
@@ -2887,7 +2906,7 @@ def notif_watcher():
 def notif_feed(serial):
     NOTIF["viewed"] = time.time()
     with NOTIF_LOCK:
-        feed = list(NOTIF["feed"].get(serial, []))
+        feed = list(NOTIF["feed"].get(notif_hw(serial) if serial else "", []))
     st = load_cfg().get("settings", {})
     return {"items": feed, "alerts": bool(st.get("phone_alerts")), "mac_alerts": st.get("notifications", True)}
 

@@ -16,7 +16,8 @@ Updated 2026-11-22. Work happens on `main`. Release **v0.2.3** is published (the
 ## Phone notifications (built 2026-11-22, in v0.3.0 work, not released)
 - `cellar.py`: `parse_notifications` reads `dumpsys notification --noredact` (title, text, bigText; skips ongoing, group summary, system). `notif_poll` keeps the first read as a baseline (no Mac alert) and alerts once per new notification through `notify()`. `notif_watcher` polls every 4 s only while Settings `phone_alerts` is on or the Notifications page was read in the last 20 s. Routes: `GET /api/notifications`, `POST /api/notifications/open?pkg=` (wakes the phone, `monkey` launches the app). Setting `phone_alerts` is off by default (privacy) and needs `notifications` on.
 - `ui.html`: `#:notifications` page in the Phone group, toggle in Settings.
-- Checked live on the A55 (Android 17): notification title and text come through; the parser read 4 real items. Not checked live: a Mac alert for a new notification, a chat-app (WhatsApp) message, Open on phone.
+- Mac alerts need `phone_alerts` on (the page alone never alerts). A failed `dumpsys` read is ignored. State is keyed by `hw_id`, so one phone on USB and Wi-Fi alerts once.
+- Checked live on the A55 (Android 17): title and text come through, and a test notification (`cmd notification post`) showed up as new within 12 s. Not checked live: a real Mac alert popup, a chat-app (WhatsApp) message, Open on phone.
 - Text messages are NOT covered: Google Messages is the default app and keeps newer chats (RCS) outside `content://sms` (newest row there is 3 Nov). Reply is not built: adb cannot send a text reliably; Open on phone is the fallback. Possible next step: `am start -a android.intent.action.SENDTO -d smsto:NUMBER --es sms_body TEXT` opens a pre-filled draft.
 - Tests added (`tests/fakebin/dumpsys`, `monkey`; API and browser). Not run locally; watch CI.
 

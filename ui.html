@@ -2067,7 +2067,7 @@ async function renderNotifications(token) {
   const draw = r => {
     const box = $("#nfList"); if (!box) return;
     box.innerHTML = r.items.length ? `<ul class="nflist">${r.items.map((n, i) => `<li class="${n.baseline ? "old" : ""}"><span class="app">${esc(n.app)} · ${esc(fmtDate(n.at))}${n.baseline ? " · was already on the phone" : ""}</span>
-      <button class="btn go" type="button" data-nfopen="${esc(n.pkg)}">Open on phone</button>
+      <button class="btn go" type="button" data-nfopen="${esc(n.pkg)}" aria-label="Open ${esc(n.app)} on the phone">Open on phone</button>
       ${n.title ? `<b>${esc(n.title)}</b>` : ""}${n.text ? `<p>${esc(n.text)}</p>` : ""}</li>`).join("")}</ul>`
       : `<p class="muted">Nothing yet. New notifications from the phone appear here while this page is open.</p>`;
   };
