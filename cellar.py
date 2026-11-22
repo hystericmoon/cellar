@@ -1626,7 +1626,32 @@ def dnd_state(serial):
 def extras_info(serial):
     clock = sh(serial, "cmd package resolve-activity --brief -a android.intent.action.SET_ALARM 2>&1")
     can_ring = bool(clock.strip()) and "No activity found" not in clock and "Exception" not in clock and "Error" not in clock
-    return {"dnd": dnd_state(serial), "can_ring": can_ring, "media_keys": list(MEDIA_KEYS)}
+    return {"dnd": dnd_state(serial), "can_ring": can_ring, "media_keys": list(MEDIA_KEYS), "clipboard": clipboard_running(serial)}
+
+
+CLIPBOARDS = {}   # serial → scrcpy process that keeps the Mac and phone clipboards the same
+
+
+def clipboard_running(serial):
+    p = CLIPBOARDS.get(serial)
+    return bool(p and p.poll() is None)
+
+
+def clipboard_sync(serial, on):
+    """Share the clipboard both ways. scrcpy with no picture and no window only syncs copy and paste."""
+    if on and not clipboard_running(serial):
+        exe = find_scrcpy()
+        if not exe:
+            raise AdbError("need_scrcpy")
+        CLIPBOARDS[serial] = subprocess.Popen([exe, "-s", serial, "--no-video", "--no-audio", "--no-window"],
+                                              env=dict(os.environ, ADB=ADB or "adb"),
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(1.5)
+        if CLIPBOARDS[serial].poll() is not None:
+            raise AdbError("Clipboard sharing could not start. Check that the phone is unlocked and USB debugging is on.")
+    elif not on and clipboard_running(serial):
+        CLIPBOARDS[serial].terminate()
+    return {"clipboard": clipboard_running(serial)}
 
 
 def drop_files(serial, paths):
@@ -3451,6 +3476,8 @@ class Handler(DavMixin, BaseHTTPRequestHandler):
             self.send_json(extras_info(s))
         elif R == ("POST", "/api/media"):
             self.send_json(media_key(s, self.body_json().get("key")))
+        elif R == ("POST", "/api/clipboard"):
+            self.send_json(clipboard_sync(s, bool(self.body_json().get("on"))))
         elif R == ("POST", "/api/dropfiles"):
             d = self.body_json()
             self.send_json(drop_files(s, d.get("paths") if isinstance(d.get("paths"), list) else []))
@@ -3651,6 +3678,12 @@ def shutdown():
     # The Mac app unmounts the phone from Finder before it stops us (unmounting from here, while
     # shutting down, could hang). If the app was killed instead, the next launch cleans up the mount.
     detach_output()
+    for p in list(CLIPBOARDS.values()) + list(MIRRORS.values()):
+        try:
+            if p.poll() is None:
+                p.terminate()
+        except Exception:
+            pass
     os._exit(0)
 
 

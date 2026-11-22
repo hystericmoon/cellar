@@ -1992,6 +1992,7 @@ async function renderExtras(token) {
     <section class="panel" aria-labelledby="xrDnd"><h2 id="xrDnd">Do Not Disturb</h2>${x.dnd == null ? `<p class="note">This phone didn’t report its Do Not Disturb setting, so it may not be controllable from here. You can still try.</p>` : ""}
       <div class="dndopts" role="radiogroup" aria-labelledby="xrDnd">${DND_OPTS.map(([k, label, sub]) => `<label class="toggle"><input type="radio" name="dnd" value="${k}" ${x.dnd === k ? "checked" : ""}><span><b>${label}</b><small>${sub}</small></span></label>`).join("")}</div>
       <p class="note" id="xrDndMsg" aria-live="polite"></p></section>
+    <section class="panel" aria-labelledby="xrClip"><label class="toggle"><input type="checkbox" id="xrClipOn" ${x.clipboard ? "checked" : ""}><span><b id="xrClip">Share the clipboard</b><small>Copy on the Mac, paste on the phone, and the other way round. Stops when you quit Cellar.</small></span></label><p class="note" id="xrClipMsg" aria-live="polite"></p></section>
     <section class="panel" aria-labelledby="xrScreen"><h2 id="xrScreen">Screen and camera</h2><div class="spbar">
       <button class="btn" type="button" data-xr="mirror">Mirror screen</button><button class="btn" type="button" data-xr="shot">Take a screenshot</button><button class="btn" type="button" data-xr="photo">Take a photo</button><button class="btn" type="button" data-xr="camera">Phone camera</button></div></section>
     </div></div></div>`;
@@ -2005,6 +2006,9 @@ async function renderExtras(token) {
   $("#xrRingGo").onclick = async () => { const b = $("#xrRingGo"), m = $("#xrRingMsg"); b.disabled = true;
     try { const r = await postJSON("/api/ring", {}); m.textContent = `Alarm set for ${r.at}. If nothing rings within a minute or two, this phone doesn’t support it.`; }
     catch(e) { m.textContent = e.message; m.className = "note bad"; } b.disabled = false; };
+  $("#xrClipOn").onchange = async e => { const m = $("#xrClipMsg"), on = e.target.checked; m.className = "note"; m.textContent = on ? "Starting…" : "";
+    try { await postJSON("/api/clipboard", {on}); m.textContent = on ? "On. Copy on one device and paste on the other." : "Off."; }
+    catch(err) { e.target.checked = !on; m.className = "note bad"; m.textContent = err.message === "need_scrcpy" ? "This needs scrcpy. Open Mirror once to install it." : err.message; } };
   document.querySelectorAll("[data-media]").forEach(b => b.onclick = () => postJSON("/api/media", {key: b.dataset.media}).catch(e => toast(e.message, {err:true})));
   document.querySelectorAll("[name=dnd]").forEach(r => r.onchange = async () => { const m = $("#xrDndMsg");
     try { await postJSON("/api/dnd", {mode: r.value}); m.className = "note"; m.textContent = "Done."; }

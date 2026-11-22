@@ -180,7 +180,8 @@ ok(cm.android_major("15")==15 and cm.android_major("")==0 and cm.android_major("
 # --- step 7: ring, media keys, Do Not Disturb
 LOG=FB+"/calls.log"
 def calls(): return open(LOG).read() if os.path.exists(LOG) else ""
-x=call("/api/extras"); ok(x["can_ring"] and x["dnd"]=="off", f"extras {x}")
+x=call("/api/extras"); ok(x["can_ring"] and x["dnd"]=="off" and x["clipboard"] is False, f"extras {x}")
+r=call("/api/clipboard","POST",{"on":False}); ok(r.get("clipboard") is False, "clipboard sharing off is a no-op")
 open(LOG,"w").close()
 r=call("/api/media","POST",{"key":"playpause"}); r2=call("/api/media","POST",{"key":"next"}); ok("input keyevent 85" in calls() and "input keyevent 87" in calls(), "media keys send the right key codes")
 ok("Unknown" in call("/api/media","POST",{"key":"rm -rf"}).get("error",""), "unknown media key refused")
