@@ -336,21 +336,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKUIDe
     @objc private func dndOn() { phoneControl("api/dnd", body: ["mode": "priority"], done: "Do Not Disturb is on", failTitle: "Couldn't change Do Not Disturb") }
     @objc private func dndOff() { phoneControl("api/dnd", body: ["mode": "off"], done: "Do Not Disturb is off", failTitle: "Couldn't change Do Not Disturb") }
 
-    private func sendDropped(_ urls: [URL]) {
-        guard connected, !urls.isEmpty else { notify("No phone connected", "Connect your phone, then drop the files again."); return }
-        request("api/dropfiles", method: "POST", body: ["paths": urls.map { $0.path }]) { [weak self] obj in
-            if let d = obj as? [String: Any], d["id"] != nil {
-                self?.notify("Sending to your phone", "\(urls.count) item\(urls.count == 1 ? "" : "s") to the Download folder. Progress is in Cellar › Transfers.")
-            } else {
-                let msg = ((obj as? [String: Any])?["error"] as? String) ?? "Cellar could not send those files."
-                self?.notify("Could not send", msg)
-            }
+    /// Shows a short word next to the menu bar icon, then removes it. (Notifications need a permission Cellar doesn't ask for.)
+    private func flash(_ text: String, seconds: Double = 3) {
+        guard let button = statusItem.button else { return }
+        button.title = " " + text
+        button.imagePosition = .imageLeft
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+            self?.statusItem.button?.title = ""
         }
     }
 
-    private func notify(_ title: String, _ text: String) {
-        let esc: (String) -> String = { $0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
-        NSAppleScript(source: "display notification \"\(esc(text))\" with title \"\(esc(title))\"")?.executeAndReturnError(nil)
+    private func sendDropped(_ urls: [URL]) {
+        guard connected, !urls.isEmpty else { flash("No phone"); return }
+        flash("Sending…", seconds: 30)
+        request("api/dropfiles", method: "POST", body: ["paths": urls.map { $0.path }]) { [weak self] obj in
+            if let d = obj as? [String: Any], d["id"] != nil {
+                self?.flash("Sent to phone")
+            } else {
+                self?.flash("Not sent")
+            }
+        }
     }
 
     @objc private func takeScreenshot() {
